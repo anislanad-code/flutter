@@ -13,7 +13,7 @@ Lire `CLAUDE.md` avant toute étape. Les étapes sont **séquentielles** : ne pa
 
 ---
 
-## Étape 0 — Fondations du dépôt
+## Étape 0 — Fondations du dépôt  `[~]` en cours — porte non franchie
 
 **Objectif.** Deux projets qui démarrent ensemble, une base connectée, une CI qui casse quand le code est mauvais. Aucune fonctionnalité métier.
 
@@ -33,12 +33,35 @@ Lire `CLAUDE.md` avant toute étape. Les étapes sont **séquentielles** : ne pa
 `docker compose up` démarre postgres + api + web. Ouvrir `http://localhost:3000/api/health` dans le navigateur → réponse `ok` provenant de Django. L'onglet réseau ne montre **aucun** appel vers le port de Django.
 
 **Terminé quand**
-- [ ] `docker compose up` fonctionne depuis un clone vierge en suivant le README
-- [ ] `.env.example` complet, `.env` dans `.gitignore`, aucun secret commité
-- [ ] `ruff`, `mypy`, `eslint`, `tsc --noEmit` passent sans erreur
-- [ ] CI GitHub Actions qui exécute lint + types + tests sur chaque push
+- [x] `docker compose up` fonctionne depuis un clone vierge en suivant le README — *2026-09-03*
+- [x] `.env.example` complet, `.env` dans `.gitignore`, aucun secret commité — *2026-09-03*
+- [x] `ruff`, `mypy`, `eslint`, `tsc --noEmit` passent sans erreur — *2026-09-03*
+- [~] CI GitHub Actions qui exécute lint + types + tests sur chaque push — *le workflow est écrit (`.github/workflows/ci.yml`) mais n'a jamais été exécuté : le dépôt n'a pas encore de remote GitHub. Tant qu'un push ne l'a pas fait tourner en vert, cette case n'est pas cochée.*
 
 **Porte** — [ ] code-reviewer · [ ] code-tester · [ ] security-tester *(focus : secrets dans le dépôt, `DEBUG`, CORS, exposition du port Django)*
+
+> **Porte non franchie — à rejouer.** Les trois sous-agents ont été lancés le 2026-09-03 et
+> ont tous été coupés en cours de route par la limite de session de l'API. Aucun rapport
+> n'a été écrit dans `docs/reviews/`. Seul le code-tester a laissé quelque chose
+> d'exploitable : les tests backend, récupérés et commités (`dcf7d3c`), 39 verts, 94 % de
+> couverture. Le QA côté web et la revue de sécurité n'ont produit aucun résultat.
+> **L'étape 0 reste ouverte tant que les trois rapports ne sont pas écrits.**
+
+**État du travail au 2026-09-03**
+
+Fait et vérifié à la main :
+- `docker compose up` monte postgres + Django + Next. `http://localhost:3000/api/health` renvoie `{"status":"ok","api":"ok","db":"ok"}` en provenance de Django, et le HTML de `/` ne contient aucune occurrence du port 8000.
+- API : Django 5.1 + DRF, settings `base/dev/prod`, Argon2 en tête, DRF en deny-by-default, CORS en liste blanche, les huit apps du §3 créées vides. `ruff`, `ruff format`, `mypy --strict` (34 fichiers), `pytest` 39 tests / 94 %, `makemigrations --check` : tous verts.
+- Web : Next 15, TypeScript strict, jetons du §6 dans `web/styles/tokens.css`, polices via `next/font`, page `/` de référence du design (à supprimer à l'étape 2), Route Handler `/api/health` validé par Zod. `eslint`, `tsc --noEmit`, `vitest` (4 tests), `next build` : tous verts.
+
+Deux défauts trouvés en ouvrant réellement la page, et corrigés :
+- La CSP statique stricte bloquait les scripts inline du streaming RSC de Next : page morte, 12 erreurs console. Remplacée par une CSP à nonce par requête (`web/middleware.ts`, `'strict-dynamic'`), plutôt que d'ouvrir `'unsafe-inline'`.
+- Le titre de 4 rem débordait à 360 px. Les trois plus gros niveaux de l'échelle sont passés en `clamp()`.
+
+Reste à faire avant de fermer l'étape :
+1. Rejouer les trois sous-agents et obtenir les trois rapports dans `docs/reviews/`.
+2. Compléter les tests web réclamés au code-tester : `web/lib/api.ts` (expiration, panne réseau, réponse non JSON, non-fuite de l'URL interne), `web/lib/env.ts`, `web/middleware.ts` (nonce différent à chaque requête).
+3. Pousser sur GitHub pour voir la CI passer en vert au moins une fois.
 
 ---
 
@@ -384,7 +407,7 @@ Paiement en sandbox de bout en bout, puis rejeu du webhook trois fois → une se
 
 | Étape | Date | Reviewer | Tester | Security | Notes |
 |---|---|---|---|---|---|
-| 0 | | | | | |
+| 0 | — | ✗ | partiel | ✗ | Les trois agents coupés par la limite de session le 2026-09-03. Aucun rapport écrit. Tests backend récupérés (39 verts, 94 %). Porte à rejouer. |
 | 1 | | | | | |
 | 2 | | | | | |
 | 3 | | | | | |
