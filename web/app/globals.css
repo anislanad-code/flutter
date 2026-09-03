@@ -1,0 +1,58 @@
+@import "../styles/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-corps);
+    font-size: var(--texte-base);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-titre);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+  }
+
+  code,
+  pre,
+  kbd {
+    font-family: var(--font-code);
+  }
+
+  /* Focus clavier visible partout — plancher de qualité du §6. */
+  :focus-visible {
+    outline: 2px solid var(--zellige);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--zellige) 22%, transparent);
+  }
+}
+
+/* Un seul moment de mouvement dans l'app, et il se coupe si l'utilisateur le demande. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Aucun port publié : seuls api et web joignent la base, par le réseau interne.
+
+  api:
+    build: ./api
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      POSTGRES_HOST: db
+    volumes:
+      - ./api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    # Django n'est PAS exposé publiquement (CLAUDE.md §3). En développement on
+    # le publie sur 127.0.0.1 uniquement, pour pouvoir déboguer à la main.
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  web:
+    build: ./web
+    env_file: .env
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:

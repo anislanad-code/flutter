@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anisdev-api"
+version = "0.1.0"
+description = "API de la plateforme de formation anis.dev"
+requires-python = ">=3.12"
+dependencies = [
+    "django==5.1.5",
+    "djangorestframework==3.15.2",
+    "django-cors-headers==4.6.0",
+    "psycopg[binary]==3.2.3",
+    "argon2-cffi==23.1.0",
+    "django-environ==0.11.2",
+    "gunicorn==23.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.8.6",
+    "mypy==1.13.0",
+    "django-stubs[compatible-mypy]==5.1.1",
+    "djangorestframework-stubs[compatible-mypy]==3.15.2",
+    "pytest==8.3.4",
+    "pytest-django==4.9.0",
+    "pytest-cov==6.0.0",
+    "factory-boy==3.3.1",
+]
+
+[tool.setuptools]
+packages = ["config", "config.settings", "apps"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle / pyflakes
+    "I",             # isort
+    "N",             # pep8-naming
+    "UP",            # pyupgrade
+    "B",             # bugbear
+    "S",             # bandit (sécurité)
+    "DJ",            # règles Django
+    "T20",           # pas de print()
+    "RUF",
+]
+ignore = [
+    "S101",    # assert autorisé dans les tests
+    "RUF012",  # attributs de classe déclaratifs de Django/DRF : listes mutables par contrat
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+exclude = ["migrations/"]
+
+[[tool.mypy.overrides]]
+module = ["*.migrations.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["environ.*"]
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "config.settings.dev"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.dev"
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers"
+testpaths = ["tests", "apps"]
+
+[tool.coverage.run]
+source = ["apps", "config"]
+omit = ["*/migrations/*", "*/tests/*"]

@@ -1,0 +1,48 @@
+/* Jetons de design — CLAUDE.md §6.
+   Cinq valeurs, plus une pour le destructif. Aucune couleur en dur ailleurs. */
+
+:root {
+  /* Palette */
+  --paper: #fafaf7;
+  --ink: #14201e;
+  --zellige: #0e6e63;
+  --safran: #e0a22b;
+  --muted: #6e7b78;
+  --danger: #b4342a;
+
+  /* Familles typographiques, injectées par next/font dans le layout racine */
+  --font-titre: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-corps: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-code: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
+
+  /* Échelle typographique — corps à 16 px minimum */
+  --texte-xs: 0.8125rem; /* 13 px, métadonnées uniquement */
+  --texte-sm: 0.9375rem; /* 15 px */
+  --texte-base: 1rem; /* 16 px, plancher du corps de texte */
+  --texte-lg: 1.125rem;
+  --texte-xl: 1.375rem;
+  --texte-2xl: 1.75rem;
+  /* Les trois plus gros niveaux sont fluides : à 360 px un titre de 4rem déborde. */
+  --texte-3xl: clamp(1.75rem, 5.5vw, 2.25rem);
+  --texte-4xl: clamp(2rem, 7vw, 3rem);
+  --texte-5xl: clamp(2.5rem, 9vw, 4rem);
+
+  /* Longueur de ligne < 72 caractères */
+  --mesure: 64ch;
+
+  /* Rythme vertical */
+  --espace-1: 0.25rem;
+  --espace-2: 0.5rem;
+  --espace-3: 0.75rem;
+  --espace-4: 1rem;
+  --espace-6: 1.5rem;
+  --espace-8: 2rem;
+  --espace-12: 3rem;
+  --espace-16: 4rem;
+  --espace-24: 6rem;
+
+  --rayon: 6px;
+  --rayon-lg: 12px;
+
+  --bordure: 1px solid color-mix(in srgb, var(--muted) 35%, transparent);
+}

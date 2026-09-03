@@ -1,0 +1,32 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Node / Next
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Divers
+.DS_Store
+media/
+staticfiles/
+
+# Sorties de Playwright MCP (captures posées à la racine)
+.playwright-mcp/
+/*.png
