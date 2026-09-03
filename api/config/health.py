@@ -24,5 +24,10 @@ class HealthView(APIView):
         except DatabaseError:
             db_status = "down"
 
-        status_code = 200 if db_status == "ok" else 503
-        return Response({"status": "ok", "db": db_status}, status=status_code)
+        # Le corps doit dire la même chose que le code HTTP : annoncer « ok » avec un
+        # 503 obligeait chaque appelant à ne lire que le statut de la réponse.
+        healthy = db_status == "ok"
+        return Response(
+            {"status": "ok" if healthy else "degraded", "db": db_status},
+            status=200 if healthy else 503,
+        )

@@ -17,14 +17,24 @@ services:
   api:
     build: ./api
     env_file: .env
+    # Rien de sensible à la configuration n'est forcé ici : un `environment:` l'emporte
+    # sur `env_file:`, et c'est par ce chemin qu'un déploiement retomberait en réglages
+    # de développement. Le module de settings vient de .env, et de lui seul.
     environment:
-      DJANGO_SETTINGS_MODULE: config.settings.dev
       POSTGRES_HOST: db
     volumes:
       - ./api:/app
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     # Django n'est PAS exposé publiquement (CLAUDE.md §3). En développement on
     # le publie sur 127.0.0.1 uniquement, pour pouvoir déboguer à la main.
     ports:
@@ -35,15 +45,16 @@ services:
 
   web:
     build: ./web
+    # `API_INTERNAL_URL` vient de .env, comme le reste. Le redéclarer ici créait deux
+    # sources pour une même valeur, dont une invisible depuis .env.
     env_file: .env
-    environment:
-      API_INTERNAL_URL: http://api:8000
     volumes:
       - ./web:/app
       - /app/node_modules
       - /app/.next
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "3000:3000"
 

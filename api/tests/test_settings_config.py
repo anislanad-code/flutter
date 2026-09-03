@@ -117,6 +117,24 @@ def test_une_cle_secrete_absente_empeche_le_demarrage() -> None:
     assert "ImproperlyConfigured" in resultat.stderr
 
 
+def test_un_chemin_d_admin_vide_empeche_le_demarrage_meme_en_developpement() -> None:
+    """Le garde-fou est dans `base.py` : aucun environnement ne monte l'admin à la racine."""
+    environnement = {**os.environ, "DJANGO_ADMIN_PATH": ""}
+
+    resultat = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", "import django; django.setup()"],
+        env=environnement,
+        capture_output=True,
+        text=True,
+        cwd=str(settings.BASE_DIR),
+        check=False,
+        timeout=60,
+    )
+
+    assert resultat.returncode != 0
+    assert "DJANGO_ADMIN_PATH" in resultat.stderr
+
+
 # --- Développement ---------------------------------------------------------
 
 
@@ -142,6 +160,35 @@ def test_la_production_exige_un_chemin_d_admin_explicite(monkeypatch: pytest.Mon
 def test_la_production_exige_une_configuration_email(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ImproperlyConfigured, match="EMAIL_BACKEND"):
         _charger_prod(monkeypatch, EMAIL_BACKEND=None)
+
+
+@pytest.mark.parametrize("valeur", ["", "   ", "/", " / "])
+def test_un_chemin_d_admin_vide_empeche_le_demarrage(
+    monkeypatch: pytest.MonkeyPatch, valeur: str
+) -> None:
+    """Une ligne `.env` laissée en blanc montait l'admin Django à la racine du site.
+
+    `DJANGO_ADMIN_PATH=` n'est pas une variable absente : elle est présente et vide.
+    `urlpatterns` devenait alors `['api/health', '/']` et `GET /%2Flogin/` renvoyait
+    le formulaire de connexion de l'admin. Constaté par la porte de sécurité de
+    l'étape 0, ÉLEVÉ-E2.
+    """
+    with pytest.raises(ImproperlyConfigured, match="DJANGO_ADMIN_PATH"):
+        _charger_prod(monkeypatch, DJANGO_ADMIN_PATH=valeur)
+
+
+def test_la_production_refuse_le_chemin_d_admin_par_defaut(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Renseigner « admin » revient à ne rien renseigner : la production le refuse."""
+    with pytest.raises(ImproperlyConfigured, match="DJANGO_ADMIN_PATH"):
+        _charger_prod(monkeypatch, DJANGO_ADMIN_PATH="admin")
+
+
+def test_le_chemin_d_admin_est_normalise() -> None:
+    """Les barres obliques encadrantes sont retirées : sinon le motif d'URL dérape."""
+    assert not settings.DJANGO_ADMIN_PATH.startswith("/")
+    assert not settings.DJANGO_ADMIN_PATH.endswith("/")
 
 
 def test_la_production_ne_sert_pas_l_admin_sur_le_chemin_par_defaut(

@@ -9,12 +9,15 @@ import { apiFetch } from "@/lib/api";
 export const dynamic = "force-dynamic";
 
 const healthSchema = z.object({
-  status: z.literal("ok"),
+  status: z.enum(["ok", "degraded"]),
   db: z.enum(["ok", "down"]),
 });
 
 export async function GET(): Promise<NextResponse> {
-  const result = await apiFetch<unknown>("/api/health");
+  /* Django répond 503 quand sa base est tombée, avec un corps exploitable : c'est
+     précisément le cas que la sonde doit distinguer d'une API injoignable. Sans cette
+     exception, une base morte serait rapportée comme « api unreachable ». */
+  const result = await apiFetch<unknown>("/api/health", {}, { acceptStatuses: [503] });
 
   if (!result.ok) {
     return NextResponse.json({ status: "down", api: "unreachable" }, { status: 503 });
@@ -26,5 +29,9 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({ status: "down", api: "invalid_response" }, { status: 502 });
   }
 
-  return NextResponse.json({ status: "ok", api: "ok", db: parsed.data.db });
+  if (parsed.data.db !== "ok") {
+    return NextResponse.json({ status: "down", api: "ok", db: "down" }, { status: 503 });
+  }
+
+  return NextResponse.json({ status: "ok", api: "ok", db: "ok" });
 }

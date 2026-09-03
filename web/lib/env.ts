@@ -3,7 +3,8 @@ import { z } from "zod";
 /* Variables d'environnement lues côté serveur uniquement.
    Rien ici n'est préfixé NEXT_PUBLIC_ : le navigateur ne connaît pas Django. */
 const serverEnvSchema = z.object({
-  API_INTERNAL_URL: z.url(),
+  // `z.url()` seul accepte ftp://, file:// et d'autres schémas. On borne au HTTP.
+  API_INTERNAL_URL: z.url({ protocol: /^https?$/ }),
 });
 
 let cache: z.infer<typeof serverEnvSchema> | null = null;

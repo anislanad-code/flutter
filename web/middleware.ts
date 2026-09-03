@@ -23,7 +23,9 @@ function politiqueCsp(nonce: string): string {
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",
-    "upgrade-insecure-requests",
+    // Inutile en local, et nuisible : forcerait le navigateur à réécrire en https
+    // les requêtes vers un poste de développement servi en clair.
+    ...(estDev ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 }
 
@@ -41,14 +43,9 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: [
-    // Tout sauf les fichiers statiques déjà servis par Next et le favicon.
-    {
-      source: "/((?!_next/static|_next/image|favicon.ico).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
-  ],
+  // Tout sauf les fichiers statiques déjà servis par Next et le favicon.
+  // Aucune condition `missing` : elles portaient sur `next-router-prefetch` et
+  // `purpose: prefetch`, deux en-têtes de requête ordinaires qu'un client pose lui-même.
+  // `curl -H "purpose: prefetch" /` renvoyait alors le document entier sans CSP.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

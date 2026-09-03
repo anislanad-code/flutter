@@ -77,13 +77,12 @@ def test_health_interroge_reellement_la_base(api_client: APIClient) -> None:
 
 
 @pytest.mark.django_db
-def test_health_annonce_ok_meme_quand_la_base_est_tombee(api_client: APIClient) -> None:
-    """Comportement constaté, pas souhaité : voir le rapport de l'étape 0 (MINEUR-1).
-
-    Le code HTTP est correct (503) et c'est lui qui pilote le BFF, mais le champ
-    `status` du corps reste « ok » alors que le service est dégradé.
-    """
+def test_health_annonce_un_service_degrade_quand_la_base_est_tombee(
+    api_client: APIClient,
+) -> None:
+    """Le corps dit la même chose que le code HTTP : 503 et « degraded », pas « ok »."""
     with patch("config.health.connection.cursor", side_effect=DatabaseError("boom")):
-        corps = api_client.get(reverse("health")).json()
+        reponse = api_client.get(reverse("health"))
 
-    assert corps == {"status": "ok", "db": "down"}
+    assert reponse.status_code == 503
+    assert reponse.json() == {"status": "degraded", "db": "down"}

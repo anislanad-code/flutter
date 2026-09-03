@@ -44,5 +44,4 @@
   --rayon: 6px;
   --rayon-lg: 12px;
 
-  --bordure: 1px solid color-mix(in srgb, var(--muted) 35%, transparent);
 }

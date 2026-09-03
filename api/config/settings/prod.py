@@ -1,5 +1,7 @@
 """Réglages de production. Tout ce qui peut être durci l'est. Voir CLAUDE.md §4.6."""
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F403
 from .base import env
 
@@ -17,7 +19,11 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
 # --- Admin Django : jamais sur le chemin par défaut ------------------------
-DJANGO_ADMIN_PATH = env.str("DJANGO_ADMIN_PATH")
+DJANGO_ADMIN_PATH = env.str("DJANGO_ADMIN_PATH").strip("/ ")
+if not DJANGO_ADMIN_PATH or DJANGO_ADMIN_PATH == "admin":
+    raise ImproperlyConfigured(
+        "DJANGO_ADMIN_PATH doit être renseigné et différent de « admin » en production."
+    )
 
 EMAIL_BACKEND = env.str("EMAIL_BACKEND")
 DEFAULT_FROM_EMAIL = env.str("DEFAULT_FROM_EMAIL")

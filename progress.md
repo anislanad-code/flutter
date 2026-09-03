@@ -13,7 +13,7 @@ Lire `CLAUDE.md` avant toute étape. Les étapes sont **séquentielles** : ne pa
 
 ---
 
-## Étape 0 — Fondations du dépôt  `[~]` en cours — porte non franchie
+## Étape 0 — Fondations du dépôt  `[~]` porte franchie sur le fond, CI jamais exécutée
 
 **Objectif.** Deux projets qui démarrent ensemble, une base connectée, une CI qui casse quand le code est mauvais. Aucune fonctionnalité métier.
 
@@ -36,32 +36,58 @@ Lire `CLAUDE.md` avant toute étape. Les étapes sont **séquentielles** : ne pa
 - [x] `docker compose up` fonctionne depuis un clone vierge en suivant le README — *2026-09-03*
 - [x] `.env.example` complet, `.env` dans `.gitignore`, aucun secret commité — *2026-09-03*
 - [x] `ruff`, `mypy`, `eslint`, `tsc --noEmit` passent sans erreur — *2026-09-03*
-- [~] CI GitHub Actions qui exécute lint + types + tests sur chaque push — *le workflow est écrit (`.github/workflows/ci.yml`) mais n'a jamais été exécuté : le dépôt n'a pas encore de remote GitHub. Tant qu'un push ne l'a pas fait tourner en vert, cette case n'est pas cochée.*
+- [ ] CI GitHub Actions qui exécute lint + types + tests sur chaque push — *le workflow est écrit et durci, mais il n'a jamais tourné : le dépôt n'a pas de remote GitHub. Tant qu'un push ne l'a pas fait passer au vert, cette case reste vide.*
 
-**Porte** — [ ] code-reviewer · [ ] code-tester · [ ] security-tester *(focus : secrets dans le dépôt, `DEBUG`, CORS, exposition du port Django)*
+**Porte** — [x] code-reviewer · [x] code-tester · [x] security-tester — *2026-09-03*
 
-> **Porte non franchie — à rejouer.** Les trois sous-agents ont été lancés le 2026-09-03 et
-> ont tous été coupés en cours de route par la limite de session de l'API. Aucun rapport
-> n'a été écrit dans `docs/reviews/`. Seul le code-tester a laissé quelque chose
-> d'exploitable : les tests backend, récupérés et commités (`dcf7d3c`), 39 verts, 94 % de
-> couverture. Le QA côté web et la revue de sécurité n'ont produit aucun résultat.
-> **L'étape 0 reste ouverte tant que les trois rapports ne sont pas écrits.**
+> **Les trois rapports sont écrits**, dans `docs/reviews/`. Ils ont fermé la porte au premier
+> passage : 2 BLOQUANT, 1 CRITIQUE, 2 ÉLEVÉ, 7 MAJEUR. Tout a été corrigé et revérifié ;
+> `docs/reviews/etape-00-suites.md` dit ce qui a été fait de chaque constatation, ce qui a été
+> assumé, et pourquoi. **Il ne reste aucun BLOQUANT ni CRITIQUE/ÉLEVÉ.**
 
-**État du travail au 2026-09-03**
+**Ce que la porte a réellement attrapé**
 
-Fait et vérifié à la main :
-- `docker compose up` monte postgres + Django + Next. `http://localhost:3000/api/health` renvoie `{"status":"ok","api":"ok","db":"ok"}` en provenance de Django, et le HTML de `/` ne contient aucune occurrence du port 8000.
-- API : Django 5.1 + DRF, settings `base/dev/prod`, Argon2 en tête, DRF en deny-by-default, CORS en liste blanche, les huit apps du §3 créées vides. `ruff`, `ruff format`, `mypy --strict` (34 fichiers), `pytest` 39 tests / 94 %, `makemigrations --check` : tous verts.
-- Web : Next 15, TypeScript strict, jetons du §6 dans `web/styles/tokens.css`, polices via `next/font`, page `/` de référence du design (à supprimer à l'étape 2), Route Handler `/api/health` validé par Zod. `eslint`, `tsc --noEmit`, `vitest` (4 tests), `next build` : tous verts.
+Cinq défauts qu'aucune commande locale ne signalait, et qui auraient tous mordu plus tard :
 
-Deux défauts trouvés en ouvrant réellement la page, et corrigés :
-- La CSP statique stricte bloquait les scripts inline du streaming RSC de Next : page morte, 12 erreurs console. Remplacée par une CSP à nonce par requête (`web/middleware.ts`, `'strict-dynamic'`), plutôt que d'ouvrir `'unsafe-inline'`.
-- Le titre de 4 rem débordait à 360 px. Les trois plus gros niveaux de l'échelle sont passés en `clamp()`.
+1. **CVE-2025-29927** — un en-tête `x-middleware-subrequest` désactivait entièrement le middleware
+   de Next 15.1.6. Aujourd'hui ça supprimait la CSP ; à l'étape 1, le même en-tête aurait contourné
+   la protection de `/app` et `/admin`. Next porté en 15.5.25, `npm audit` à zéro.
+2. **La CSP à nonce tuait la page en production.** `next build` prérendait `/` en statique, donc
+   sans nonce, et `'strict-dynamic'` annule `'self'` : tous les scripts bloqués. Invisible en
+   `next dev`, où la page est dynamique — la validation « ça marche » de l'étape 0 avait été faite
+   en dev seulement. Le layout lit désormais le nonce, ce qui force le rendu dynamique.
+3. **`api/apps/media/` n'était pas dans le dépôt** : la règle `.gitignore` `media/`, sans ancrage,
+   avalait l'application du §3 — celle qui portera la signature des tokens Bunny. Un clone vierge
+   n'aurait pas démarré, et ce code aurait échappé à toutes les relectures suivantes.
+4. **Le middleware s'excluait sur des en-têtes contrôlés par le client** (`purpose: prefetch`) :
+   deuxième chemin, indépendant du premier, pour obtenir la page sans CSP.
+5. **`DJANGO_ADMIN_PATH=` vide** — la forme exacte d'une ligne `.env` laissée en blanc — montait
+   l'admin Django à la racine du site.
 
-Reste à faire avant de fermer l'étape :
-1. Rejouer les trois sous-agents et obtenir les trois rapports dans `docs/reviews/`.
-2. Compléter les tests web réclamés au code-tester : `web/lib/api.ts` (expiration, panne réseau, réponse non JSON, non-fuite de l'URL interne), `web/lib/env.ts`, `web/middleware.ts` (nonce différent à chaque requête).
-3. Pousser sur GitHub pour voir la CI passer en vert au moins une fois.
+**Leçon retenue pour les étapes suivantes.** Trois des cinq ne se voyaient qu'en construisant
+et en servant un vrai build de production. Vérifier en `next dev` ne prouve rien sur ce qui sera
+déployé : chaque étape doit inclure un passage sur `next build` + `next start`.
+
+**Reporté explicitement**
+
+- `style-src 'unsafe-inline'` reste nécessaire à Next et Tailwind. Il permettrait de neutraliser
+  visuellement le watermark du §4.1 sans toucher au DOM, donc sans réveiller le `MutationObserver`.
+  **À traiter à l'étape 4** : l'observateur devra surveiller le style calculé, pas seulement le DOM.
+- Le rate limiting de la sonde `/api/health` (publique, une requête SQL par appel) arrive avec
+  celui de l'étape 1.
+
+**État vérifié au 2026-09-03**
+
+| Contrôle | Résultat |
+|---|---|
+| `ruff` · `ruff format` · `mypy --strict` | vert |
+| `pytest --cov` | 49 tests, 100 % |
+| `manage.py check --deploy` sur `settings.prod` | 0 problème |
+| `eslint` · `tsc --noEmit` | vert |
+| `vitest --coverage` | 98 tests, 100 % des instructions |
+| `next build` | vert, aucune route prérendue en statique |
+| `npm audit` prod et dev | 0 vulnérabilité |
+| Parcours manuel | `/api/health` 200 ; base éteinte → 503 `db: down` ; relancée → 200 |
 
 ---
 
@@ -407,7 +433,7 @@ Paiement en sandbox de bout en bout, puis rejeu du webhook trois fois → une se
 
 | Étape | Date | Reviewer | Tester | Security | Notes |
 |---|---|---|---|---|---|
-| 0 | — | ✗ | partiel | ✗ | Les trois agents coupés par la limite de session le 2026-09-03. Aucun rapport écrit. Tests backend récupérés (39 verts, 94 %). Porte à rejouer. |
+| 0 | 2026-09-03 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 2 BLOQUANT, 1 CRITIQUE, 2 ÉLEVÉ, 7 MAJEUR. Tout corrigé, voir `etape-00-suites.md`. 147 tests. Reste : faire tourner la CI une fois. |
 | 1 | | | | | |
 | 2 | | | | | |
 | 3 | | | | | |

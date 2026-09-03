@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "API de la plateforme de formation anis.dev"
 requires-python = ">=3.12"
 dependencies = [
-    "django==5.1.5",
-    "djangorestframework==3.15.2",
-    "django-cors-headers==4.6.0",
+    "django==5.2.17",
+    "djangorestframework==3.18.0",
+    "django-cors-headers==4.9.0",
     "psycopg[binary]==3.2.3",
     "argon2-cffi==23.1.0",
     "django-environ==0.11.2",
@@ -20,9 +20,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff==0.8.6",
-    "mypy==1.13.0",
-    "django-stubs[compatible-mypy]==5.1.1",
-    "djangorestframework-stubs[compatible-mypy]==3.15.2",
+    "mypy==1.18.2",
+    "django-stubs[compatible-mypy]==6.1.0",
+    "djangorestframework-stubs[compatible-mypy]==3.18.1",
     "pytest==8.3.4",
     "pytest-django==4.9.0",
     "pytest-cov==6.0.0",

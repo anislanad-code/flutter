@@ -21,12 +21,17 @@ node_modules/
 out/
 next-env.d.ts
 *.tsbuildinfo
+coverage/
+.vercel
+
+# Django à l'exécution. Les règles sont ancrées : sans le « / » initial, « media/ »
+# avalait aussi api/apps/media/, l'application du §3, qui a disparu du dépôt sans bruit.
+/api/media/
+/api/staticfiles/
+
+# Captures et traces d'outils de vérification, déposées à la racine
+.playwright-mcp/
+/reference-*.png
 
 # Divers
 .DS_Store
-media/
-staticfiles/
-
-# Sorties de Playwright MCP (captures posées à la racine)
-.playwright-mcp/
-/*.png

@@ -7,6 +7,7 @@ Ce module ne décide jamais seul d'un choix de sécurité : il pose le socle str
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -19,7 +20,11 @@ DEBUG: bool = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS: list[str] = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 
 # Chemin de l'admin Django. En production, prod.py exige une valeur explicite (§4.6).
-DJANGO_ADMIN_PATH: str = env.str("DJANGO_ADMIN_PATH", default="admin")
+# Une valeur vide — la forme d'une ligne `.env` laissée en blanc — monterait l'admin
+# à la racine du site : on refuse de démarrer plutôt que de l'exposer.
+DJANGO_ADMIN_PATH: str = env.str("DJANGO_ADMIN_PATH", default="admin").strip("/ ")
+if not DJANGO_ADMIN_PATH:
+    raise ImproperlyConfigured("DJANGO_ADMIN_PATH ne peut pas être vide.")
 
 # --- Applications ----------------------------------------------------------
 DJANGO_APPS = [

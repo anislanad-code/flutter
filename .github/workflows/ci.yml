@@ -68,7 +68,18 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
 
       - name: pytest
-        run: pytest --cov=apps --cov=config --cov-report=term-missing
+        run: pytest --cov=apps --cov=config --cov-report=term-missing --cov-fail-under=80
+
+      # La CI ne validait que `settings.dev` : les réglages qui comptent vraiment
+      # n'étaient jamais chargés. `check --deploy` les exerce et échoue sur un socle mou.
+      - name: Contrôle de déploiement sur les réglages de production
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_ALLOWED_HOSTS: anis.dev
+          DJANGO_ADMIN_PATH: chemin-de-ci
+          EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+          DEFAULT_FROM_EMAIL: contact@anis.dev
+        run: python manage.py check --deploy --fail-level WARNING
 
   web:
     name: Web — lint, types, tests, build
@@ -99,10 +110,30 @@ jobs:
         run: npm run typecheck
 
       - name: vitest
-        run: npm run test
+        run: npm run test:cov
 
       - name: build
         run: npm run build
+
+      # Une CSP à nonce sur une page prérendue en statique bloque tous ses scripts.
+      # Le build doit rester intégralement dynamique tant que le nonce est la seule
+      # défense : `○ (Static)` dans la sortie de build est une régression.
+      - name: Aucune route prérendue en statique
+        run: |
+          if npm run build 2>&1 | grep -qE "^○|\(Static\)"; then
+            echo "::error::une route est prérendue en statique : la CSP à nonce la casse"
+            exit 1
+          fi
+
+  images:
+    name: Les images Docker se construisent
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: api
+        run: docker build -t anisdev-api ./api
+      - name: web
+        run: docker build -t anisdev-web ./web
 
   secrets:
     name: Aucun secret dans le dépôt
