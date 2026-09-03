@@ -99,6 +99,8 @@ DATABASES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+AUTH_USER_MODEL = "accounts.User"
+
 # --- Mots de passe (CLAUDE.md §4.2) ----------------------------------------
 # Argon2id en tête. PBKDF2 reste présent uniquement pour relire d'anciens hachages.
 PASSWORD_HASHERS = [
@@ -119,9 +121,30 @@ AUTH_PASSWORD_VALIDATORS = [
 # --- DRF : deny by default (CLAUDE.md §4.3) --------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "apps.accounts.authentication.CookieAccessTokenAuthentication"
+    ],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "UNAUTHENTICATED_USER": None,
+}
+
+# --- Authentification (CLAUDE.md §4.2) --------------------------------------
+# Access court, refresh rotatif. Valeurs figées en code : ce ne sont pas des choix de
+# déploiement, mais des décisions de sécurité qui ne doivent pas varier entre environnements.
+ACCESS_TOKEN_TTL_SECONDS = 15 * 60
+REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
+PASSWORD_RESET_TOKEN_TTL_SECONDS = 30 * 60
+
+# URL publique du site Next, utilisée pour construire les liens envoyés par email.
+SITE_URL: str = env.str("SITE_URL", default="http://localhost:3000")
+
+# --- Cache : compteurs de limitation de débit (§4.2) ------------------------
+# Backend mémoire locale par défaut : correct en dev/tests/mono-worker. Voir la limite
+# documentée dans apps/accounts/throttling.py pour un déploiement multi-worker.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
 }
 
 # --- CORS : liste blanche, jamais "*" (CLAUDE.md §4.6) ---------------------

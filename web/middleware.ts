@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { ACCESS_COOKIE } from "@/lib/auth-cookie-names";
+
 /* CSP à nonce (CLAUDE.md §4.6).
    Next injecte des scripts inline pour le streaming RSC : sans nonce, une CSP stricte
    casse la page. On génère donc un nonce par requête plutôt que d'ouvrir 'unsafe-inline'.
@@ -29,7 +31,23 @@ function politiqueCsp(nonce: string): string {
   ].join("; ");
 }
 
+/* Protection de /app et /admin (étape 1). Un simple contrôle de présence du cookie :
+   la vraie autorisation reste côté Django (deny by default, §4.3) — ceci n'évite qu'un
+   aller-retour inutile à un visiteur non connecté. Un cookie expiré mais présent laisse
+   passer ici ; l'appel API qui suit échoue alors en 401 et déclenche un refresh côté client. */
+const CHEMINS_PROTEGES = ["/app", "/admin"];
+
+function cheminProtege(pathname: string): boolean {
+  return CHEMINS_PROTEGES.some((prefixe) => pathname === prefixe || pathname.startsWith(`${prefixe}/`));
+}
+
 export function middleware(request: NextRequest): NextResponse {
+  if (cheminProtege(request.nextUrl.pathname) && !request.cookies.get(ACCESS_COOKIE)) {
+    const connexion = new URL("/connexion", request.url);
+    connexion.searchParams.set("suite", request.nextUrl.pathname);
+    return NextResponse.redirect(connexion);
+  }
+
   const nonce = crypto.randomUUID();
   const csp = politiqueCsp(nonce);
 

@@ -74,9 +74,11 @@ def test_drf_n_expose_pas_l_api_navigable() -> None:
     assert all("Browsable" not in rendu for rendu in rendus)
 
 
-def test_drf_n_active_aucune_authentification_implicite() -> None:
-    """Chaque mécanisme d'authentification sera déclaré explicitement à l'étape 1."""
-    assert settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] == []
+def test_drf_n_active_qu_une_authentification_par_cookie_httponly() -> None:
+    """Étape 1 : le seul mécanisme d'authentification est le cookie httpOnly (§4.2)."""
+    assert settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] == [
+        "apps.accounts.authentication.CookieAccessTokenAuthentication"
+    ]
     assert settings.REST_FRAMEWORK["UNAUTHENTICATED_USER"] is None
 
 
