@@ -117,10 +117,16 @@ jobs:
 
       # Une CSP à nonce sur une page prérendue en statique bloque tous ses scripts.
       # Le build doit rester intégralement dynamique tant que le nonce est la seule
-      # défense : `○ (Static)` dans la sortie de build est une régression.
+      # défense : une ligne de route marquée `○` dans la sortie de build est une
+      # régression. Attention : la légende du tableau ("○  (Static)   prerendered
+      # as static content") contient elle aussi la sous-chaîne "(Static)" — un grep
+      # sur "(Static)" seul matche donc TOUJOURS, même sans aucune route statique.
+      # On ne regarde que les vraies lignes de route (préfixées par ├/└), et on
+      # exclut `/icon.svg` : c'est une route de métadonnées (favicon) générée par
+      # Next, jamais du HTML avec des <script>, donc hors du champ de la CSP à nonce.
       - name: Aucune route prérendue en statique
         run: |
-          if npm run build 2>&1 | grep -qE "^○|\(Static\)"; then
+          if npm run build 2>&1 | grep -E "^[├└] ○" | grep -qvE "/icon\.svg"; then
             echo "::error::une route est prérendue en statique : la CSP à nonce la casse"
             exit 1
           fi
