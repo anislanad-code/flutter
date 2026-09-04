@@ -114,13 +114,42 @@ déployé : chaque étape doit inclure un passage sur `next build` + `next start
 Créer un compte → recevoir l'email de bienvenue (console en dev) → se déconnecter → se reconnecter → demander une réinitialisation → changer le mot de passe → constater que **les sessions ouvertes sur un autre navigateur sont bien coupées**. Vérifier dans DevTools que `localStorage` et `sessionStorage` sont vides et que le cookie porte `httpOnly`, `Secure`, `SameSite=Strict`.
 
 **Terminé quand**
-- [ ] Un refresh token rejoué invalide toute la famille et déconnecte
-- [ ] 6 tentatives de connexion échouées en 15 min renvoient un 429
-- [ ] Connexion avec un email inexistant et avec un mauvais mot de passe donnent la même réponse
-- [ ] Aucune route ne permet à un tiers de définir le mot de passe d'un autre compte
-- [ ] Tests : ≥ 80 % sur `apps/accounts`
+- [x] Un refresh token rejoué invalide toute la famille et déconnecte — *2026-09-04*
+- [x] 6 tentatives de connexion échouées en 15 min renvoient un 429 — *2026-09-04*
+- [x] Connexion avec un email inexistant et avec un mauvais mot de passe donnent la même réponse — *2026-09-04*
+- [x] Aucune route ne permet à un tiers de définir le mot de passe d'un autre compte — *2026-09-04*
+- [x] Tests : ≥ 80 % sur `apps/accounts` — *100 %, 2026-09-04*
 
-**Porte** — [ ] code-reviewer · [ ] code-tester · [ ] security-tester *(checklist §8 points 6 et 3 en priorité)*
+**Porte** — [x] code-reviewer · [x] code-tester · [x] security-tester — *2026-09-04*
+
+> Porte fermée au premier passage : **3 BLOQUANT** (code-reviewer) et **1 ÉLEVÉ** (security-tester),
+> tous les trois sur la même racine — `POST /api/auth/register` connectait automatiquement après
+> inscription, et une réponse avec tokens (email libre) contre une réponse sans tokens (email déjà
+> pris) est un oracle d'énumération à elle seule, même à statut identique (§4.2). Corrigé en
+> supprimant toute connexion automatique au register : Django ne renvoie plus jamais de session
+> depuis cette route, dans aucun des deux cas ; le formulaire d'inscription enchaîne un vrai
+> `POST /api/auth/login` (déjà audité comme n'énumérant rien) pour connecter l'utilisateur. Un
+> deuxième BLOQUANT (le contrôle CI « aucune route prérendue en statique ») s'est révélé
+> ne jamais avoir vraiment vérifié quoi que ce soit — corrigé et vérifié par mutation. Un
+> troisième (contraste AA de `text-muted` sur `paper`, 4,36:1 sous le seuil 4,5:1) corrigé sur
+> les écrans de cette étape sans toucher au token figé du §6. Tout revérifié : **porte ouverte,
+> 0 BLOQUANT / CRITIQUE / ÉLEVÉ**. 392 tests (176 backend, 100 % de couverture sur `apps` +
+> `config` ; 216 frontend, 99,4 % d'instructions).
+
+**Reporté explicitement**
+
+- Le chaînage register→login referme l'oracle d'énumération au prix d'un effet de bord mineur :
+  créer un compte sur l'email de quelqu'un d'autre ne le compromet jamais, mais reste un « squat »
+  bruyant, journalisé et plafonné (20 tentatives/15 min/IP) — pas de vérification de propriété
+  d'email à cette étape. À traiter avec la vérification d'email, hors périmètre pour l'instant.
+- `Session.device_fingerprint` n'est pas encore alimenté par un vrai identifiant côté navigateur
+  (le BFF ne relaie que l'IP, pas d'empreinte d'appareil) — sans conséquence pour l'étape 1, mais
+  à revoir avant l'étape 4 (session unique de lecture vidéo, §4.1.5).
+- Aucun code n'appelle encore `POST /api/auth/refresh` : la session applicative expire donc de
+  fait à 15 minutes malgré un cookie de 7 jours. Le rafraîchissement silencieux côté client est à
+  construire à l'étape 5 (parcours), quand l'espace étudiant aura des appels répétés à enchaîner.
+- Limitation de débit sur cache mémoire locale (mono-processus) : correcte en dev/tests/mono-worker,
+  à brancher sur un cache partagé (Redis) à l'étape 10 pour un déploiement multi-worker.
 
 ---
 
@@ -434,7 +463,7 @@ Paiement en sandbox de bout en bout, puis rejeu du webhook trois fois → une se
 | Étape | Date | Reviewer | Tester | Security | Notes |
 |---|---|---|---|---|---|
 | 0 | 2026-09-03 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 2 BLOQUANT, 1 CRITIQUE, 2 ÉLEVÉ, 7 MAJEUR. Tout corrigé, voir `etape-00-suites.md`. 147 tests. Reste : faire tourner la CI une fois. |
-| 1 | | | | | |
+| 1 | 2026-09-04 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 3 BLOQUANT (dont l'oracle d'énumération au register) et 1 ÉLEVÉ, même racine. Corrigé et revérifié : 0 BLOQUANT/CRITIQUE/ÉLEVÉ. 392 tests (176 backend 100 %, 216 frontend 99,4 %). Reste : la CI n'a toujours jamais tourné (voir étape 0). |
 | 2 | | | | | |
 | 3 | | | | | |
 | 4 | | | | | |
