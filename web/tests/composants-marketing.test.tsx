@@ -4,6 +4,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 import { Faq } from "@/components/marketing/Faq";
 import { LecteurChapitre } from "@/components/course/LecteurChapitre";
 import { LecteurVideo } from "@/components/marketing/LecteurVideo";
@@ -87,6 +91,29 @@ describe("LecteurChapitre", () => {
     );
 
     expect(html).not.toContain("Ressources");
+  });
+
+  it("propose le QCM du chapitre quand un id est fourni, avec le suivi de progression", () => {
+    render(
+      createElement(LecteurChapitre, {
+        chapitre: CHAPITRE,
+        avecSuiviDeProgression: true,
+        quizId: 42,
+      }),
+    );
+
+    const lien = screen.getByRole("link", { name: "Passer le QCM du chapitre" });
+    expect(lien.getAttribute("href")).toBe("/app/qcm/42");
+  });
+
+  it("n'affiche aucun lien de QCM tant qu'aucun n'est posé", () => {
+    render(
+      createElement(LecteurChapitre, { chapitre: CHAPITRE, avecSuiviDeProgression: true }),
+    );
+
+    expect(
+      screen.queryByRole("link", { name: "Passer le QCM du chapitre" }),
+    ).toBeNull();
   });
 });
 

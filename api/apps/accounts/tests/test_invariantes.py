@@ -29,11 +29,20 @@ def _sources_python() -> list[Path]:
 
 
 def test_aucun_serializer_n_expose_is_correct() -> None:
-    """§4.4 — les bonnes réponses ne quittent jamais le serveur avant soumission."""
+    """§4.4 — les bonnes réponses ne quittent jamais le serveur avant soumission.
+
+    Grille grossière (texte brut), volontaire pour rester une sentinelle simple : elle
+    couvre toutes les applications *sauf* `apps.assessment`, où `is_correct` apparaît
+    légitimement depuis l'étape 6 — mais seulement dans le serializer d'une réponse
+    déjà corrigée. Ce cas précis a son propre test, à l'introspection des champs plutôt
+    qu'au texte, dans `tests/test_security_baseline.py::test_aucun_serializer_n_expose_is_correct`.
+    """
     coupables = [
         chemin
         for chemin in _sources_python()
-        if chemin.name in {"serializers.py", "views.py"} and "is_correct" in chemin.read_text()
+        if chemin.name in {"serializers.py", "views.py"}
+        and "/apps/assessment/" not in chemin.as_posix()
+        and "is_correct" in chemin.read_text()
     ]
 
     assert coupables == [], f"`is_correct` apparaît dans {coupables}"

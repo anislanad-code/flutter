@@ -14,6 +14,7 @@ class ChapterStateSerializer(serializers.Serializer[EtatChapitre]):
     title = serializers.CharField(source="chapter.title")
     is_free = serializers.BooleanField(source="chapter.is_free")
     state = serializers.CharField()
+    quiz_id = serializers.IntegerField(allow_null=True)
 
 
 class ModuleStateSerializer(serializers.Serializer[EtatModule]):
@@ -25,6 +26,8 @@ class ModuleStateSerializer(serializers.Serializer[EtatModule]):
     total_chapters = serializers.IntegerField()
     chapters = ChapterStateSerializer(many=True)
     recommande_apres_ordre = serializers.IntegerField(allow_null=True)
+    exam_quiz_id = serializers.IntegerField(allow_null=True)
+    exam_passed = serializers.BooleanField()
 
 
 class PipelineSerializer(serializers.Serializer[EtatPipeline]):

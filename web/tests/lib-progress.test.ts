@@ -26,6 +26,8 @@ const PIPELINE = {
       completed_chapters: 0,
       total_chapters: 2,
       recommande_apres_ordre: null,
+      exam_quiz_id: null,
+      exam_passed: false,
       chapters: [
         {
           id: 1,
@@ -34,6 +36,7 @@ const PIPELINE = {
           title: "Installer Flutter",
           is_free: true,
           state: "disponible",
+        quiz_id: null,
         },
       ],
     },

@@ -16,6 +16,7 @@ export const chapitreEtatSchema = z.object({
   title: z.string(),
   is_free: z.boolean(),
   state: etatNoeudSchema,
+  quiz_id: z.number().nullable(),
 });
 
 export const moduleEtatSchema = z.object({
@@ -27,6 +28,8 @@ export const moduleEtatSchema = z.object({
   total_chapters: z.number(),
   chapters: z.array(chapitreEtatSchema),
   recommande_apres_ordre: z.number().nullable(),
+  exam_quiz_id: z.number().nullable(),
+  exam_passed: z.boolean(),
 });
 
 export const pipelineSchema = z.object({

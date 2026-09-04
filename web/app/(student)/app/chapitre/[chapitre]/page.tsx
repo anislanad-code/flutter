@@ -49,9 +49,11 @@ export default async function PageChapitreEtudiant({ params }: Props) {
     moduleDeCeChapitre && !moduleDeCeChapitre.unlocked
       ? moduleDeCeChapitre.recommande_apres_ordre
       : null;
-  const dejaTermine =
-    moduleDeCeChapitre?.chapters.find((c) => c.slug === slug)?.state ===
-    "termine";
+  const chapitreDansPipeline = moduleDeCeChapitre?.chapters.find(
+    (c) => c.slug === slug,
+  );
+  const dejaTermine = chapitreDansPipeline?.state === "termine";
+  const quizId = chapitreDansPipeline?.quiz_id ?? null;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-5 py-16">
@@ -92,6 +94,7 @@ export default async function PageChapitreEtudiant({ params }: Props) {
         chapitre={chapitre}
         avecSuiviDeProgression
         dejaTermine={dejaTermine}
+        quizId={quizId}
       />
     </main>
   );

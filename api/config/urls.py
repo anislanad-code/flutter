@@ -16,6 +16,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
     path("api/", include("apps.enrollment.urls")),
     path("api/", include("apps.media.urls")),
     path("api/", include("apps.learning.urls")),
+    path("api/", include("apps.assessment.urls")),
     path("api/public/", include("apps.catalog.urls")),
     path(f"{admin_path}/", admin.site.urls),
 ]

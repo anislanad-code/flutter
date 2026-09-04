@@ -35,6 +35,8 @@ const PIPELINE = {
       completed_chapters: 1,
       total_chapters: 2,
       recommande_apres_ordre: null,
+      exam_quiz_id: null,
+      exam_passed: false,
       chapters: [
         {
           id: 1,
@@ -43,6 +45,7 @@ const PIPELINE = {
           title: "Installer Flutter",
           is_free: true,
           state: "termine",
+          quiz_id: null,
         },
         {
           id: 2,
@@ -51,6 +54,7 @@ const PIPELINE = {
           title: "Premier widget",
           is_free: false,
           state: "en_cours",
+          quiz_id: null,
         },
       ],
     },
@@ -62,6 +66,8 @@ const PIPELINE = {
       completed_chapters: 0,
       total_chapters: 1,
       recommande_apres_ordre: 0,
+      exam_quiz_id: null,
+      exam_passed: false,
       chapters: [
         {
           id: 3,
@@ -70,6 +76,7 @@ const PIPELINE = {
           title: "Premier écran",
           is_free: false,
           state: "recommande_plus_tard",
+          quiz_id: null,
         },
       ],
     },
@@ -113,6 +120,30 @@ describe("Pipeline", () => {
 
     render(<Pipeline pipeline={vierge} />);
     expect(screen.getByRole("link", { name: "Commencer" })).toBeTruthy();
+  });
+
+  it("propose l'examen du module quand il en a un et qu'il n'est pas encore réussi", () => {
+    const avecExamen = {
+      ...PIPELINE,
+      modules: [{ ...PIPELINE.modules[0]!, exam_quiz_id: 7, exam_passed: false }],
+    } satisfies PipelineType;
+
+    render(<Pipeline pipeline={avecExamen} />);
+
+    const lien = screen.getByRole("link", { name: "Passer l'examen du module" });
+    expect(lien.getAttribute("href")).toBe("/app/qcm/7");
+  });
+
+  it("affiche un badge de réussite plutôt qu'un lien une fois l'examen réussi", () => {
+    const examenReussi = {
+      ...PIPELINE,
+      modules: [{ ...PIPELINE.modules[0]!, exam_quiz_id: 7, exam_passed: true }],
+    } satisfies PipelineType;
+
+    render(<Pipeline pipeline={examenReussi} />);
+
+    expect(screen.getByText("Examen du module réussi.")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Passer l'examen du module" })).toBeNull();
   });
 
   it("un module recommandé plus tard reste cliquable, jamais un cadenas", () => {

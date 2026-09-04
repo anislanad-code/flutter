@@ -88,6 +88,21 @@ export function Pipeline({ pipeline, chapitreVientDeTerminer }: Props) {
                 </p>
               ) : null}
 
+              {mod.exam_quiz_id !== null ? (
+                <p className="mt-2 text-[length:var(--texte-sm)]">
+                  {mod.exam_passed ? (
+                    <span className="text-zellige">Examen du module réussi.</span>
+                  ) : (
+                    <Link
+                      href={`/app/qcm/${mod.exam_quiz_id}`}
+                      className="text-zellige underline underline-offset-4"
+                    >
+                      Passer l&apos;examen du module
+                    </Link>
+                  )}
+                </p>
+              ) : null}
+
               <ol className="mt-4 flex flex-col gap-3 border-l border-muted/40 pl-6">
                 {mod.chapters.map((chapitre) => (
                   <li

@@ -54,9 +54,9 @@ def test_le_routage_n_expose_que_la_sonde_les_includes_connus_et_l_admin() -> No
 
     assert _routes_applicatives() == ["api/health"]
     # apps.accounts.urls, apps.catalog.urls_private, apps.enrollment.urls,
-    # apps.media.urls et apps.learning.urls (préfixe "api/"), apps.catalog.urls
-    # (préfixe "api/public/"), et admin.site.urls. Rien d'autre.
-    assert len(resolveurs) == 7
+    # apps.media.urls, apps.learning.urls et apps.assessment.urls (préfixe "api/"),
+    # apps.catalog.urls (préfixe "api/public/"), et admin.site.urls. Rien d'autre.
+    assert len(resolveurs) == 8
 
 
 def test_les_routes_d_authentification_sont_exposees_sous_api() -> None:
@@ -102,6 +102,12 @@ def test_les_routes_de_lecture_video_sont_exposees_sous_api() -> None:
 def test_les_routes_du_pipeline_sont_exposees_sous_api() -> None:
     assert reverse("progress") == "/api/progress"
     assert reverse("chapter-complete", kwargs={"slug": "x"}) == "/api/chapters/x/complete"
+
+
+def test_les_routes_des_qcm_sont_exposees_sous_api() -> None:
+    assert reverse("quiz-detail", kwargs={"id": 1}) == "/api/quizzes/1"
+    assert reverse("quiz-start-attempt", kwargs={"id": 1}) == "/api/quizzes/1/attempts"
+    assert reverse("attempt-submit", kwargs={"id": 1}) == "/api/attempts/1/submit"
 
 
 def test_le_chapitre_authentifie_n_est_pas_sous_le_prefixe_public() -> None:

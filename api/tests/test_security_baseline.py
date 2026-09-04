@@ -89,16 +89,27 @@ def _serializers_du_projet() -> list[type[serializers.BaseSerializer]]:
     return trouves
 
 
+# Seul le serializer qui décrit une réponse *déjà corrigée* — construit uniquement une
+# fois `Attempt.submitted_at` posé, dans `AttemptSubmitView` — a le droit d'exposer
+# `is_correct` (§4.4 : « ne quittent jamais le serveur avant soumission », pas jamais
+# tout court). Tout autre serializer, y compris celui de lecture d'un quiz avant
+# tentative (`EtatQuizSerializer` / `ChoixPublicSerializer`), reste couvert par
+# l'interdiction stricte.
+SERIALIZERS_AUTORISES_A_EXPOSER_IS_CORRECT = {"ChoixCorrigeSerializer"}
+
+
 def test_aucun_serializer_n_expose_is_correct() -> None:
-    """La bonne réponse d'un QCM ne quitte jamais le serveur (§4.4)."""
+    """La bonne réponse d'un QCM ne quitte jamais le serveur avant soumission (§4.4)."""
     for classe in _serializers_du_projet():
         champs_declares = set(getattr(classe, "_declared_fields", {}))
         meta = getattr(classe, "Meta", None)
         champs_meta = set(getattr(meta, "fields", ()) or ())
+        assert getattr(meta, "fields", None) != "__all__", classe
 
+        if classe.__name__ in SERIALIZERS_AUTORISES_A_EXPOSER_IS_CORRECT:
+            continue
         assert "is_correct" not in champs_declares, classe
         assert "is_correct" not in champs_meta, classe
-        assert getattr(meta, "fields", None) != "__all__", classe
 
 
 @pytest.mark.django_db

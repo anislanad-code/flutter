@@ -2,11 +2,12 @@
 
 `Progress` porte l'état par chapitre — posé dès l'étape 4 pour `watched_s`, complété
 ici avec les transitions `IN_PROGRESS` → `DONE`. `ModuleCompletion` existe dès
-l'étape 5 pour correspondre au modèle de données de référence, mais son champ
-`exam_passed` reste `False` pour tout le monde tant que l'étape 6 n'a pas posé les
-QCM : il n'y a pas encore d'examen à réussir. Le déverrouillage du module suivant, à
-cette étape, se calcule donc à la volée à partir de `Progress` (tous les chapitres du
-module précédent à `DONE`), pas depuis cette table — voir `apps/learning/services.py`.
+l'étape 5 pour correspondre au modèle de données de référence ; `exam_passed` et
+`best_score` sont mis à jour depuis l'étape 6 par `apps.assessment.services` quand une
+tentative d'examen de module est soumise. Le déverrouillage du module suivant exige
+donc, depuis cette étape, à la fois tous les chapitres du module précédent à `DONE` et
+son examen réussi s'il en a un — voir `calculer_pipeline` dans
+`apps/learning/services.py`.
 """
 
 from __future__ import annotations
@@ -45,8 +46,9 @@ class Progress(models.Model):
 
 
 class ModuleCompletion(models.Model):
-    """Réussite d'un module. Posée pour l'étape 6 (examens réels) : voir docstring du
-    module. `best_score` reste `None` tant qu'aucune tentative n'existe.
+    """Réussite d'un module. Mise à jour par `apps.assessment.services` quand une
+    tentative d'examen (`Quiz.module` non nul) est soumise. `best_score` reste `None`
+    tant qu'aucune tentative n'existe.
     """
 
     user = models.ForeignKey(

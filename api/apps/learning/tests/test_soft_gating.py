@@ -269,7 +269,15 @@ def test_un_compte_pending_ne_voit_pas_le_pipeline_dun_contenu_payant_par_cette_
 
     for module in corps["modules"]:
         for chapitre in module["chapters"]:
-            assert set(chapitre) == {"id", "slug", "order", "title", "is_free", "state"}
+            assert set(chapitre) == {
+                "id",
+                "slug",
+                "order",
+                "title",
+                "is_free",
+                "state",
+                "quiz_id",
+            }
 
 
 def test_progress_404_quand_le_cours_est_depublie(

@@ -37,6 +37,8 @@ const PIPELINE = {
       completed_chapters: 1,
       total_chapters: 2,
       recommande_apres_ordre: null,
+      exam_quiz_id: null,
+      exam_passed: false,
       chapters: [
         {
           id: 1,
@@ -45,6 +47,7 @@ const PIPELINE = {
           title: "Installer Flutter",
           is_free: true,
           state: "termine",
+          quiz_id: null,
         },
         {
           id: 2,
@@ -53,6 +56,7 @@ const PIPELINE = {
           title: "Premier widget",
           is_free: false,
           state: "en_cours",
+          quiz_id: null,
         },
       ],
     },
@@ -64,6 +68,8 @@ const PIPELINE = {
       completed_chapters: 0,
       total_chapters: 1,
       recommande_apres_ordre: 0,
+      exam_quiz_id: null,
+      exam_passed: false,
       chapters: [
         {
           id: 3,
@@ -72,6 +78,7 @@ const PIPELINE = {
           title: "Premier écran",
           is_free: false,
           state: "recommande_plus_tard",
+          quiz_id: null,
         },
       ],
     },
@@ -198,6 +205,8 @@ describe("Pipeline — cas limites d'affichage", () => {
           completed_chapters: 0,
           total_chapters: 0,
           recommande_apres_ordre: 2,
+      exam_quiz_id: null,
+      exam_passed: false,
           chapters: [],
         },
       ],

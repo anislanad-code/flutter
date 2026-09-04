@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { BoutonTerminerChapitre } from "@/components/course/BoutonTerminerChapitre";
 import { LecteurSecurise } from "@/components/course/LecteurSecurise";
 import type { Chapitre } from "@/lib/catalog-schemas";
@@ -16,12 +18,15 @@ type Props = {
   /** Vrai si le pipeline dit déjà ce chapitre `termine` — évite au bouton de proposer
    *  de le marquer terminé une seconde fois et de rejouer l'animation pour rien. */
   dejaTermine?: boolean;
+  /** Id du QCM de fin de chapitre (étape 6), ou `null` s'il n'y en a pas encore. */
+  quizId?: number | null;
 };
 
 export function LecteurChapitre({
   chapitre,
   avecSuiviDeProgression = false,
   dejaTermine = false,
+  quizId = null,
 }: Props) {
   const blocs = analyserTranscript(chapitre.lesson.transcript);
 
@@ -86,11 +91,19 @@ export function LecteurChapitre({
       ) : null}
 
       {avecSuiviDeProgression ? (
-        <div className="border-t border-muted/40 pt-6">
+        <div className="flex flex-col gap-4 border-t border-muted/40 pt-6">
           <BoutonTerminerChapitre
             chapitreSlug={chapitre.slug}
             dejaTermine={dejaTermine}
           />
+          {quizId !== null ? (
+            <Link
+              href={`/app/qcm/${quizId}`}
+              className="self-start text-[length:var(--texte-base)] text-zellige underline underline-offset-4"
+            >
+              Passer le QCM du chapitre
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -65,7 +65,11 @@ def test_progress_renvoie_la_structure_du_pipeline(
         "title",
         "is_free",
         "state",
+        "quiz_id",
     }
+    assert corps["modules"][0]["chapters"][0]["quiz_id"] is None
+    assert "exam_quiz_id" in corps["modules"][0]
+    assert "exam_passed" in corps["modules"][0]
 
 
 def test_complete_marque_le_chapitre_termine(

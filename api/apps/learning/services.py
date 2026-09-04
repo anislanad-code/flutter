@@ -15,9 +15,10 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.assessment.models import Quiz
 from apps.catalog.models import Chapter, Course
 from apps.enrollment.services import a_acces_au_contenu
-from apps.learning.models import Progress
+from apps.learning.models import ModuleCompletion, Progress
 
 # --- Position de lecture (étape 4) ------------------------------------------
 
@@ -105,6 +106,8 @@ def terminer_chapitre(*, user: User, chapter: Chapter) -> Progress:
 class EtatChapitre:
     chapter: Chapter
     state: str  # "termine" | "en_cours" | "disponible" | "recommande_plus_tard"
+    # Id du QCM de fin de chapitre (étape 6), ou `None` s'il n'y en a pas encore.
+    quiz_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +123,9 @@ class EtatModule:
     # `None` quand `unlocked` est vrai (rien à recommander). Sert à l'infobulle
     # « Termine d'abord le module N » (§6) — jamais le module lui-même.
     recommande_apres_ordre: int | None
+    # Id de l'examen de ce module (étape 6), ou `None` s'il n'y en a pas.
+    exam_quiz_id: int | None = None
+    exam_passed: bool = False
 
 
 @dataclass(frozen=True)
@@ -141,14 +147,15 @@ def calculer_pipeline(*, user: User, course: Course) -> EtatPipeline:
     """État de chaque nœud du serpentin pour `user`, calculé côté serveur (§6).
 
     Un module est déverrouillé (`unlocked`) si c'est le premier de la formation, ou si
-    tous les chapitres du module précédent sont `DONE` (un module sans chapitre compte
-    comme complet : rien à y terminer ne doit pas verrouiller la suite indéfiniment).
-    Un module verrouillé reste entièrement cliquable — `unlocked` ne pilote que
-    l'opacité et l'infobulle « recommandé plus tard », jamais un refus côté serveur
-    (§2). Un chapitre payant qu'`user` n'a pas le droit de voir (§4.4) est traité comme
-    « recommandé plus tard » lui aussi : ce n'est ni un mensonge (il n'est pas
-    disponible tant que la formation n'est pas payée) ni une fuite (seuls titre et
-    ordre, déjà publics, sortent de ce point d'API).
+    tous les chapitres du module précédent sont `DONE` **et** que l'examen du module
+    précédent, s'il en a un, est réussi (étape 6 — un module sans chapitre ou sans
+    examen compte comme complet sur ce point : rien à y faire ne doit pas verrouiller
+    la suite indéfiniment). Un module verrouillé reste entièrement cliquable —
+    `unlocked` ne pilote que l'opacité et l'infobulle « recommandé plus tard », jamais
+    un refus côté serveur (§2). Un chapitre payant qu'`user` n'a pas le droit de voir
+    (§4.4) est traité comme « recommandé plus tard » lui aussi : ce n'est ni un
+    mensonge (il n'est pas disponible tant que la formation n'est pas payée) ni une
+    fuite (seuls titre et ordre, déjà publics, sortent de ce point d'API).
     """
     acces = a_acces_au_contenu(user, course)
     # `.all()` seul, sans `.order_by()` : l'ordre déclaré par `Chapter.Meta.ordering`
@@ -159,6 +166,18 @@ def calculer_pipeline(*, user: User, course: Course) -> EtatPipeline:
     etats = {
         (p.chapter_id): p.state
         for p in Progress.objects.filter(user=user, chapter__module__course=course)
+    }
+    quiz_par_chapitre = dict(
+        Quiz.objects.filter(chapter__module__course=course).values_list("chapter_id", "id")
+    )
+    quiz_par_module = dict(
+        Quiz.objects.filter(module__course=course).values_list("module_id", "id")
+    )
+    examens_reussis = {
+        mc.module_id
+        for mc in ModuleCompletion.objects.filter(
+            user=user, module__course=course, exam_passed=True
+        )
     }
 
     resultats: list[EtatModule] = []
@@ -177,13 +196,18 @@ def calculer_pipeline(*, user: User, course: Course) -> EtatPipeline:
             progress_state = etats.get(chap.id)
             accessible = acces or chap.is_free
             etat = _etat_chapitre(progress_state, unlocked, accessible)
-            chapitre_etats.append(EtatChapitre(chapter=chap, state=etat))
+            chapitre_etats.append(
+                EtatChapitre(chapter=chap, state=etat, quiz_id=quiz_par_chapitre.get(chap.id))
+            )
             if etat == "termine":
                 termines += 1
             if etat == "en_cours" and resume is None:
                 resume = (mod.order, chap.slug)
             if etat == "disponible" and resume_fallback is None:
                 resume_fallback = (mod.order, chap.slug)
+
+        exam_quiz_id = quiz_par_module.get(mod.id)
+        exam_passed = mod.id in examens_reussis
 
         resultats.append(
             EtatModule(
@@ -195,9 +219,13 @@ def calculer_pipeline(*, user: User, course: Course) -> EtatPipeline:
                 total_chapters=len(chapitres),
                 chapters=chapitre_etats,
                 recommande_apres_ordre=None if unlocked else ordre_module_precedent,
+                exam_quiz_id=exam_quiz_id,
+                exam_passed=exam_passed,
             )
         )
-        module_precedent_complet = termines == len(chapitres)
+        module_precedent_complet = termines == len(chapitres) and (
+            exam_quiz_id is None or exam_passed
+        )
         ordre_module_precedent = mod.order
 
     return EtatPipeline(
