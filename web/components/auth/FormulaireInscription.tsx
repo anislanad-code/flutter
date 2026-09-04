@@ -13,12 +13,14 @@ export function FormulaireInscription() {
   const [enCours, setEnCours] = useState(false);
   const [erreurGenerale, setErreurGenerale] = useState<string | null>(null);
   const [erreurMotDePasse, setErreurMotDePasse] = useState<string | null>(null);
+  const [messageInfo, setMessageInfo] = useState<string | null>(null);
 
   async function envoyer(evenement: React.FormEvent) {
     evenement.preventDefault();
     setEnCours(true);
     setErreurGenerale(null);
     setErreurMotDePasse(null);
+    setMessageInfo(null);
 
     try {
       const reponse = await fetch("/api/auth/register", {
@@ -53,7 +55,9 @@ export function FormulaireInscription() {
       });
 
       if (!connexion.ok) {
-        setErreurGenerale("Compte créé. Connecte-toi pour continuer.");
+        // Pas une erreur : le compte est bien créé, seule la connexion automatique a
+        // échoué (typiquement parce que l'email appartenait déjà à quelqu'un d'autre).
+        setMessageInfo("Compte créé. Connecte-toi pour continuer.");
         return;
       }
 
@@ -101,6 +105,14 @@ export function FormulaireInscription() {
       {erreurGenerale ? (
         <p role="alert" className="text-[length:var(--texte-sm)] text-danger">
           {erreurGenerale}
+        </p>
+      ) : null}
+      {messageInfo ? (
+        <p role="status" className="text-[length:var(--texte-sm)] text-zellige">
+          {messageInfo}{" "}
+          <a href="/connexion" className="underline underline-offset-4">
+            Se connecter
+          </a>
         </p>
       ) : null}
 

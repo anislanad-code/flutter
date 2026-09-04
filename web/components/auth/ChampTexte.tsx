@@ -34,7 +34,7 @@ export function ChampTexte({
         onChange={(evenement) => onChange(evenement.target.value)}
         aria-invalid={erreur ? true : undefined}
         aria-describedby={erreur ? `${id}-erreur` : undefined}
-        className="rounded border border-muted/50 bg-paper px-3 py-2.5 text-[length:var(--texte-base)] text-ink outline-none focus-visible:border-zellige focus-visible:ring-2 focus-visible:ring-zellige/40"
+        className="rounded border border-muted bg-paper px-3 py-2.5 text-[length:var(--texte-base)] text-ink outline-none focus-visible:border-zellige focus-visible:ring-2 focus-visible:ring-zellige/40"
       />
       {erreur ? (
         <p id={`${id}-erreur`} className="text-[length:var(--texte-sm)] text-danger">

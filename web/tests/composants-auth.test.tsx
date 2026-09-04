@@ -274,10 +274,12 @@ describe("FormulaireInscription", () => {
     await userEvent.type(screen.getByLabelText("Mot de passe"), "un-mot-de-passe-long");
     await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
 
-    const alerte = await screen.findByRole("alert");
-    expect(alerte.textContent).toBe("Compte créé. Connecte-toi pour continuer.");
-    expect(alerte.textContent).not.toMatch(/existe|déjà|pris/i);
+    // Pas une erreur : role="status", pas "alert" — le compte est bien créé.
+    const info = await screen.findByRole("status");
+    expect(info.textContent).toContain("Compte créé. Connecte-toi pour continuer.");
+    expect(info.textContent).not.toMatch(/existe|déjà|pris/i);
     expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("aucun cookie n'est attendu de /api/auth/register : deux appels, jamais un seul", async () => {
