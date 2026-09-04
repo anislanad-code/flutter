@@ -11,7 +11,7 @@ export function Tarifs() {
       <h2 id="titre-tarifs" className="font-titre text-[length:var(--texte-2xl)] font-semibold">
         Un seul prix, un seul palier
       </h2>
-      <p className="mt-3 max-w-mesure text-[length:var(--texte-base)] text-muted">
+      <p className="mt-3 max-w-mesure text-[length:var(--texte-base)] text-ink">
         Pas d&apos;abonnement, pas de palier premium. Tu payes une fois, tu gardes l&apos;accès.
       </p>
 
@@ -19,7 +19,7 @@ export function Tarifs() {
         <p className="font-titre text-[length:var(--texte-4xl)] font-semibold">
           {PRIX_DA.toLocaleString("fr-DZ")} DA
         </p>
-        <p className="mt-1 text-[length:var(--texte-sm)] text-muted">
+        <p className="mt-1 text-[length:var(--texte-sm)] text-ink">
           Paiement unique. Accès à vie à la formation.
         </p>
         <ul className="mt-6 flex flex-col gap-2 text-[length:var(--texte-sm)]">
@@ -27,7 +27,7 @@ export function Tarifs() {
           <li>— QCM de fin de chapitre et examens de module</li>
           <li>— Mises à jour du contenu incluses</li>
         </ul>
-        <p className="mt-6 text-[length:var(--texte-sm)] text-muted">
+        <p className="mt-6 text-[length:var(--texte-sm)] text-ink">
           Versement CCP, puis reçu à téléverser depuis ton compte — validé sous 24 h.
         </p>
       </div>
@@ -36,7 +36,7 @@ export function Tarifs() {
         <h3 className="font-titre text-[length:var(--texte-lg)] font-semibold">
           Pas encore prêt·e à payer ?
         </h3>
-        <p className="mt-2 max-w-mesure text-[length:var(--texte-sm)] text-muted">
+        <p className="mt-2 max-w-mesure text-[length:var(--texte-sm)] text-ink">
           Laisse ton email, on te préviendra à chaque nouveau chapitre publié.
         </p>
         <div className="mt-4">

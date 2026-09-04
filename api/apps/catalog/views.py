@@ -7,7 +7,6 @@ l'existence d'un chapitre payant ou d'un cours non publié (§4.3, §4.4).
 from __future__ import annotations
 
 from django.http import Http404
-from django.shortcuts import get_object_or_404
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -33,9 +32,16 @@ class CoursePublicDetailView(APIView):
     authentication_classes: list[type[BaseAuthentication]] = []
 
     def get(self, request: Request, slug: str) -> Response:
-        course = get_object_or_404(
-            Course.objects.prefetch_related("modules__chapters"), slug=slug, is_published=True
-        )
+        try:
+            course = Course.objects.prefetch_related("modules__chapters").get(
+                slug=slug, is_published=True
+            )
+        except Course.DoesNotExist:
+            # Pas de message d'erreur construit à partir de la requête (§4.3) : Django
+            # y mettrait le slug demandé, ce qui distinguerait un cours en préparation
+            # d'un cours qui n'existe pas du tout. `Http404` sans argument laisse DRF
+            # renvoyer son "Not found." générique, identique dans les deux cas.
+            raise Http404 from None
         return Response(CoursePublicSerializer(course).data)
 
 
@@ -46,11 +52,15 @@ class ChapterPublicDetailView(APIView):
     authentication_classes: list[type[BaseAuthentication]] = []
 
     def get(self, request: Request, slug: str) -> Response:
-        chapter = get_object_or_404(
-            Chapter.objects.select_related("lesson", "module", "module__course"), slug=slug
-        )
+        try:
+            chapter = Chapter.objects.select_related("lesson", "module", "module__course").get(
+                slug=slug
+            )
+        except Chapter.DoesNotExist:
+            raise Http404 from None
         if not chapter.is_free or not chapter.module.course.is_published:
-            # Même réponse qu'un chapitre inexistant : ne pas confirmer qu'il existe.
+            # Même réponse — sans argument, donc bit pour bit identique — qu'un
+            # chapitre inexistant : ne jamais confirmer qu'il existe (§4.3).
             raise Http404
         return Response(ChapterFreeDetailSerializer(chapter).data)
 

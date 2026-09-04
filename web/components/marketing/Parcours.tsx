@@ -19,7 +19,7 @@ export function Parcours({ cours }: Props) {
             Module {mod.order} — {mod.title}
           </h3>
           {mod.summary ? (
-            <p className="mt-1 max-w-mesure text-[length:var(--texte-sm)] text-muted">
+            <p className="mt-1 max-w-mesure text-[length:var(--texte-sm)] text-ink">
               {mod.summary}
             </p>
           ) : null}

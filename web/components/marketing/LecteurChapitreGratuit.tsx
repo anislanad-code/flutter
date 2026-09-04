@@ -11,10 +11,12 @@ export function LecteurChapitreGratuit({ chapitre }: Props) {
 
   return (
     <div className="flex flex-col gap-8">
-      <LecteurVideo
-        src={chapitre.lesson.video_provider_id ? `/videos/${chapitre.lesson.video_provider_id}.mp4` : null}
-        titre={chapitre.title}
-      />
+      {/* Aucune URL de fichier vidéo ne doit atteindre le client (§4.1.1) : pas de MP4
+          public ni servi par Django (§2). `video_provider_id` est l'identifiant Bunny —
+          la lecture réelle arrive à l'étape 4, via une URL signée émise par le serveur.
+          En attendant, `src` reste toujours `null` ; ce composant ne le fabrique jamais
+          lui-même. */}
+      <LecteurVideo src={null} titre={chapitre.title} />
 
       <div className="flex flex-col gap-4">
         {blocs.map((bloc, index) => {

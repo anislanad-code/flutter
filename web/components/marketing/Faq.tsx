@@ -38,7 +38,7 @@ export function Faq() {
             <dt className="font-titre text-[length:var(--texte-base)] font-semibold">
               {question}
             </dt>
-            <dd className="mt-2 text-[length:var(--texte-base)] text-muted">{reponse}</dd>
+            <dd className="mt-2 text-[length:var(--texte-base)] text-ink">{reponse}</dd>
           </div>
         ))}
       </dl>

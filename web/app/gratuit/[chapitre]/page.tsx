@@ -39,7 +39,7 @@ export default async function ChapitreGratuitPage({ params }: Props) {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 sm:py-16">
-      <p className="text-[length:var(--texte-sm)] text-muted">
+      <p className="text-[length:var(--texte-sm)] text-ink">
         <Link href="/" className="underline underline-offset-4">
           {chapitre.course_title}
         </Link>{" "}
@@ -60,7 +60,7 @@ export default async function ChapitreGratuitPage({ params }: Props) {
         <h2 className="font-titre text-[length:var(--texte-lg)] font-semibold">
           La suite t&apos;intéresse ?
         </h2>
-        <p className="mt-2 max-w-mesure text-[length:var(--texte-sm)] text-muted">
+        <p className="mt-2 max-w-mesure text-[length:var(--texte-sm)] text-ink">
           Crée ton compte pour garder ta progression, ou laisse ton email pour être
           prévenu·e des prochains chapitres.
         </p>

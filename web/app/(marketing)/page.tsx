@@ -28,14 +28,21 @@ export const metadata: Metadata = {
 };
 
 export default async function Landing() {
-  const [cours, chapitreGratuit] = await Promise.all([
-    recupererCours(SLUG_FORMATION_PRINCIPALE),
-    recupererChapitreGratuit("installer-flutter-et-configurer-ton-editeur"),
-  ]);
+  const cours = await recupererCours(SLUG_FORMATION_PRINCIPALE);
 
   // La landing n'a de sens que si la formation existe et est publiée : sans elle,
   // il n'y a rien à vendre. Un cours dépublié ne doit pas laisser une page cassée.
   if (!cours) notFound();
+
+  // Le chapitre à jouer dans le hero suit le flag `is_free` en base, jamais un slug
+  // codé en dur (§4.4) : c'est le même flag que `Parcours` utilise pour dessiner le
+  // parcours juste en dessous, donc les deux ne peuvent pas se contredire.
+  const slugChapitreGratuit = cours.modules
+    .flatMap((mod) => mod.chapters)
+    .find((chapitre) => chapitre.is_free)?.slug;
+  const chapitreGratuit = slugChapitreGratuit
+    ? await recupererChapitreGratuit(slugChapitreGratuit)
+    : null;
 
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
@@ -44,8 +51,10 @@ export default async function Landing() {
       <script
         type="application/ld+json"
         nonce={nonce}
-        // Données structurées Course (schema.org) — texte JSON statique, dérivé de
-        // `cours` (contrôlé par notre back-office), jamais de saisie libre injectée telle quelle.
+        // Données structurées Course (schema.org). `cours.title`/`description` viennent
+        // du back-office (§1 — l'admin publie le contenu), pas d'une saisie visiteur,
+        // mais `JSON.stringify` seul ne protège pas contre un `</script>` littéral dans
+        // le texte qui romprait hors du bloc JSON-LD : `<` est échappé en `<`.
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
@@ -54,7 +63,7 @@ export default async function Landing() {
             description: cours.description,
             provider: { "@type": "Organization", name: "anis.dev" },
             inLanguage: "fr",
-          }),
+          }).replace(/</g, "\\u003c"),
         }}
       />
 
@@ -68,7 +77,7 @@ export default async function Landing() {
           >
             {cours.title}
           </h1>
-          <p className="mt-4 max-w-mesure text-[length:var(--texte-lg)] text-muted">
+          <p className="mt-4 max-w-mesure text-[length:var(--texte-lg)] text-ink">
             {cours.description}
           </p>
 
@@ -76,7 +85,7 @@ export default async function Landing() {
             {chapitreGratuit ? (
               <LecteurChapitreGratuit chapitre={chapitreGratuit} />
             ) : (
-              <p className="text-[length:var(--texte-base)] text-muted">
+              <p className="text-[length:var(--texte-base)] text-ink">
                 Le chapitre gratuit est momentanément indisponible.
               </p>
             )}
@@ -90,7 +99,7 @@ export default async function Landing() {
           >
             Le programme
           </h2>
-          <p className="mt-3 max-w-mesure text-[length:var(--texte-base)] text-muted">
+          <p className="mt-3 max-w-mesure text-[length:var(--texte-base)] text-ink">
             Module par module, chapitre par chapitre. Le premier chapitre est ouvert ; le
             reste s&apos;ouvre après ton inscription.
           </p>
@@ -111,7 +120,7 @@ export default async function Landing() {
               <dt className="font-titre text-[length:var(--texte-base)] font-semibold">
                 Vidéo + code
               </dt>
-              <dd className="mt-2 text-[length:var(--texte-sm)] text-muted">
+              <dd className="mt-2 text-[length:var(--texte-sm)] text-ink">
                 Chaque chapitre est une leçon vidéo courte, avec le vrai code écrit à
                 l&apos;écran — pas de diapositives.
               </dd>
@@ -120,7 +129,7 @@ export default async function Landing() {
               <dt className="font-titre text-[length:var(--texte-base)] font-semibold">
                 QCM de fin de chapitre
               </dt>
-              <dd className="mt-2 text-[length:var(--texte-sm)] text-muted">
+              <dd className="mt-2 text-[length:var(--texte-sm)] text-ink">
                 Un court QCM après chaque chapitre vérifie que tu as compris avant de
                 continuer.
               </dd>
@@ -129,7 +138,7 @@ export default async function Landing() {
               <dt className="font-titre text-[length:var(--texte-base)] font-semibold">
                 Examen de module
               </dt>
-              <dd className="mt-2 text-[length:var(--texte-sm)] text-muted">
+              <dd className="mt-2 text-[length:var(--texte-sm)] text-ink">
                 À la fin de chaque module, un examen plus long avec un seuil de réussite.
               </dd>
             </div>
