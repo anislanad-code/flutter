@@ -17,6 +17,8 @@ def test_chapitre_gratuit_renvoie_le_contenu_complet(
     corps = reponse.json()
     assert corps["is_free"] is True
     assert "flutter doctor" in corps["lesson"]["transcript"]
+    assert "id" in corps["lesson"]
+    assert "video_provider_id" not in corps["lesson"]
 
 
 def test_chapitre_payant_est_inaccessible_par_lapi_publique(

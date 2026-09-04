@@ -1,16 +1,26 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { ACCESS_COOKIE } from "@/lib/auth-cookie-names";
+import { ACCESS_COOKIE, DEVICE_COOKIE } from "@/lib/auth-cookie-names";
 
 /* CSP à nonce (CLAUDE.md §4.6).
    Next injecte des scripts inline pour le streaming RSC : sans nonce, une CSP stricte
    casse la page. On génère donc un nonce par requête plutôt que d'ouvrir 'unsafe-inline'.
-   La frame Bunny sera ajoutée ici, explicitement, à l'étape 4. */
+   Lecteur HLS maison (jeton CDN lié à l'IP) : pas d'iframe Bunny, `frame-src 'none`. */
 
 const estDev = process.env.NODE_ENV === "development";
 
+function origineBunny(): string {
+  /* Hostname seulement, jamais une URL de fichier. Un caractère hors [a-z0-9.-]
+     est refusé : la CSP n'est pas un endroit où interpoler de l'entrée brute. */
+  const brut = (process.env.BUNNY_CDN_HOSTNAME ?? "").trim();
+  const hote = brut.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!hote || !/^[a-z0-9.-]+$/i.test(hote)) return "";
+  return `https://${hote}`;
+}
+
 function politiqueCsp(nonce: string): string {
+  const bunny = origineBunny();
   return [
     "default-src 'self'",
     // 'strict-dynamic' : seuls les scripts porteurs du nonce, et ceux qu'ils chargent.
@@ -19,8 +29,10 @@ function politiqueCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src 'self'${estDev ? " ws: wss:" : ""}`,
+    `connect-src 'self'${estDev ? " ws: wss:" : ""}${bunny ? ` ${bunny}` : ""}`,
+    bunny ? `media-src 'self' blob: ${bunny}` : "media-src 'self' blob:",
     "frame-ancestors 'none'",
+    // Lecteur HLS maison, pas l'iframe Bunny : l'IP locking exige un jeton CDN.
     "frame-src 'none'",
     "form-action 'self'",
     "base-uri 'self'",
@@ -57,6 +69,16 @@ export function middleware(request: NextRequest): NextResponse {
 
   const response = NextResponse.next({ request: { headers: enTetesRequete } });
   response.headers.set("Content-Security-Policy", csp);
+
+  if (!request.cookies.get(DEVICE_COOKIE)) {
+    response.cookies.set(DEVICE_COOKIE, crypto.randomUUID(), {
+      httpOnly: true,
+      secure: !estDev,
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
   return response;
 }
 

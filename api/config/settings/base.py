@@ -157,6 +157,25 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 100
 
+# --- Lecture vidéo Bunny Stream (CLAUDE.md §4.1) -----------------------------
+# L'identifiant de bibliothèque n'est pas un secret ; la clé de signature l'est.
+# Vides en développement tant qu'aucune vidéo n'est déposée : l'émission d'un
+# jeton refuse alors poliment, sans jamais inventer une URL.
+BUNNY_LIBRARY_ID: str = env.str("BUNNY_LIBRARY_ID", default="")
+BUNNY_API_KEY: str = env.str("BUNNY_API_KEY", default="")
+BUNNY_TOKEN_AUTH_KEY: str = env.str("BUNNY_TOKEN_AUTH_KEY", default="")
+BUNNY_CDN_HOSTNAME: str = env.str("BUNNY_CDN_HOSTNAME", default="")
+# TTL figé : un jeton de lecture ne vit pas plus de 5 minutes (§4.1.2).
+PLAYBACK_TOKEN_TTL_SECONDS = 5 * 60
+# Limites d'émission. Les seuils de *détection* de partage (§4.1.6) sont plus
+# bas que le rate limit : on flague avant de couper l'émission.
+PLAYBACK_RATE_LIMIT_BURST = 12
+PLAYBACK_RATE_LIMIT_BURST_WINDOW_SECONDS = 60
+PLAYBACK_RATE_LIMIT_HOURLY = 80
+PLAYBACK_FLAG_TOKENS_PER_HOUR = 40
+PLAYBACK_FLAG_IP_PREFIXES_PER_HOUR = 2
+PLAYBACK_FLAG_FINGERPRINTS_7D = 3
+
 # --- Versement CCP (CLAUDE.md §2 : manuel d'abord, Chargily à l'étape 11) ---
 # Coordonnées destinées à être affichées : ce ne sont pas des secrets, mais ce sont
 # des données de déploiement — jamais en dur dans le code.

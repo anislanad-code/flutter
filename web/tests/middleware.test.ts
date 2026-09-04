@@ -69,13 +69,15 @@ describe("middleware — en-tête CSP", () => {
     ["base-uri", "base-uri 'self'"],
     ["form-action", "form-action 'self'"],
     ["frame-src", "frame-src 'none'"],
+    ["media-src", "media-src 'self' blob:"],
     ["upgrade-insecure-requests", "upgrade-insecure-requests"],
   ])("déclare %s", (nom, attendu) => {
     expect(directive(csp(), nom)).toBe(attendu);
   });
 
-  it("n'ouvre aucune frame tierce avant l'étape 4 (Bunny ajouté explicitement)", () => {
-    expect(csp()).not.toContain("bunny");
+  it("n'ouvre aucune frame tierce : la lecture HLS n'a pas besoin d'iframe", () => {
+    expect(directive(csp(), "frame-src")).toBe("frame-src 'none'");
+    expect(csp()).not.toContain("mediadelivery");
     expect(csp()).not.toContain("*");
   });
 
@@ -160,5 +162,71 @@ describe("middleware — portée", () => {
     }
     expect(JSON.stringify(config.matcher)).not.toContain("missing");
     expect(JSON.stringify(config.matcher)).not.toContain("prefetch");
+  });
+});
+
+describe("middleware — Bunny et empreinte d'appareil", () => {
+  it("ajoute l'hôte CDN à connect-src et media-src quand il est configuré", async () => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BUNNY_CDN_HOSTNAME", "vz-test.b-cdn.net");
+    const { middleware: mw } = await import("@/middleware");
+
+    const politique = mw(requete()).headers.get("Content-Security-Policy") ?? "";
+    expect(directive(politique, "connect-src")).toBe(
+      "connect-src 'self' https://vz-test.b-cdn.net",
+    );
+    expect(directive(politique, "media-src")).toBe(
+      "media-src 'self' blob: https://vz-test.b-cdn.net",
+    );
+    expect(directive(politique, "frame-src")).toBe("frame-src 'none'");
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("refuse un hostname CDN qui n'en est pas un", async () => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BUNNY_CDN_HOSTNAME", "evil.example; script-src *");
+    const { middleware: mw } = await import("@/middleware");
+
+    const politique = mw(requete()).headers.get("Content-Security-Policy") ?? "";
+    expect(politique).not.toContain("evil.example");
+    expect(politique).not.toContain("script-src *");
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("pose un cookie device httpOnly s'il est absent", () => {
+    const reponse = middleware(requete());
+    const pose = reponse.cookies.get("device");
+    expect(pose).toBeDefined();
+    expect(pose?.httpOnly).toBe(true);
+    expect(pose?.sameSite).toBe("strict");
+    expect(pose?.value).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+  });
+
+  it("ne réécrit pas le cookie device s'il est déjà posé", () => {
+    const brute = new Request("https://anis.dev/", { headers: { cookie: "device=deja-la" } });
+    const reponse = middleware(new NextRequest(brute));
+    expect(reponse.cookies.get("device")).toBeUndefined();
+  });
+
+  it("retire le schéma et le chemin d'un hostname CDN avant de l'injecter", async () => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BUNNY_CDN_HOSTNAME", "https://vz-test.b-cdn.net/secret/path");
+    const { middleware: mw } = await import("@/middleware");
+
+    const politique = mw(requete()).headers.get("Content-Security-Policy") ?? "";
+    expect(politique).toContain("https://vz-test.b-cdn.net");
+    expect(politique).not.toContain("/secret/path");
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
   });
 });

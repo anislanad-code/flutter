@@ -50,7 +50,7 @@ const CHAPITRE_PAYANT = {
   slug: "premier-widget",
   title: "Ton premier widget",
   is_free: false,
-  lesson: { video_provider_id: "", duration_s: 600, transcript: "Contenu.", resources: [] },
+  lesson: { id: 1, duration_s: 600, transcript: "Contenu.", resources: [] },
   module_title: "Mise en route",
   course_slug: "flutter-firebase-debutants",
   course_title: "Flutter + Firebase",

@@ -16,7 +16,7 @@ const CHAPITRE = {
   slug: "installer-flutter",
   title: "Installer Flutter",
   is_free: true,
-  lesson: { video_provider_id: "", duration_s: 10, transcript: "Texte.", resources: [] },
+  lesson: { id: 1, duration_s: 10, transcript: "Texte.", resources: [] },
   module_title: "Mise en route",
   course_slug: "flutter-firebase-debutants",
   course_title: "Flutter + Firebase",

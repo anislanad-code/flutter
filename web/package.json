@@ -12,6 +12,7 @@
     "test:cov": "NODE_ENV=test vitest run --coverage"
   },
   "dependencies": {
+    "hls.js": "^1.7.2",
     "next": "^15.5.25",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -56,7 +56,7 @@ const CHAPITRE_GRATUIT = {
   slug: "installer-flutter-et-configurer-ton-editeur",
   title: "Installer Flutter",
   is_free: true,
-  lesson: { video_provider_id: "", duration_s: 480, transcript: "Texte libre.", resources: [] },
+  lesson: { id: 1, duration_s: 480, transcript: "Texte libre.", resources: [] },
   module_title: "Mise en route",
   course_slug: "flutter-firebase-debutants",
   course_title: "Flutter + Firebase pour débutants absolus",

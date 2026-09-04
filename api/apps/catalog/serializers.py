@@ -39,9 +39,17 @@ class CoursePublicSerializer(serializers.ModelSerializer[Course]):
 
 
 class LessonSerializer(serializers.ModelSerializer[Lesson]):
+    """Le contenu pédagogique, sans l'identifiant du fournisseur vidéo (§4.1.1).
+
+    `video_provider_id` ne quitte jamais l'API par ce serializer : la lecture passe
+    par `POST /api/lessons/{id}/playback`, qui émet une URL signée à TTL court.
+    `id` est exposé pour que le client sache *quelle* leçon demander, pas *où*
+    elle est hébergée.
+    """
+
     class Meta:
         model = Lesson
-        fields = ["video_provider_id", "duration_s", "transcript", "resources"]
+        fields = ["id", "duration_s", "transcript", "resources"]
         read_only_fields = fields
 
 

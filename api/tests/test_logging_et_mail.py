@@ -34,6 +34,27 @@ def test_un_jeton_de_reset_est_masque() -> None:
     assert "3GePJN6bZxBoNXMAvkm5MV6U6KLMpJsqHq7iJ40TIe0" not in masque
 
 
+def test_une_url_mediadelivery_est_masquee() -> None:
+    # Le motif exige un préfixe avant `iframe.mediadelivery.net` (hôte CDN
+    # `player.iframe.mediadelivery.net`, pas le hostname nu).
+    ligne = "embed https://player.iframe.mediadelivery.net/embed/12345/abc?autoplay=true"
+    masque = rediger_secrets(ligne)
+    assert "player.iframe.mediadelivery.net" not in masque
+    assert "12345" not in masque
+    assert "https://***" in masque
+
+
+def test_une_url_bunny_signee_est_masquee() -> None:
+    ligne = (
+        "lecture https://vz-test.b-cdn.net/bcdn_token=HS256-abcdef0123456789"
+        "&token_path=%2Fvideo%2F&expires=1700000000/video/playlist.m3u8"
+    )
+    masque = rediger_secrets(ligne)
+    assert "abcdef0123456789" not in masque
+    assert "vz-test.b-cdn.net" not in masque
+    assert "https://***" in masque
+
+
 def test_le_filtre_redige_un_mapping_d_arguments() -> None:
     record = logging.LogRecord(
         name="django.server",

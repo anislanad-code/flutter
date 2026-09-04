@@ -29,6 +29,8 @@ class AuditLog(models.Model):
         PROOF_PURGED = "PROOF_PURGED", "Preuve de paiement purgée"
         ENROLLMENT_ACCEPTED = "ENROLLMENT_ACCEPTED", "Inscription validée"
         ENROLLMENT_REJECTED = "ENROLLMENT_REJECTED", "Preuve refusée"
+        PLAYBACK_ISSUED = "PLAYBACK_ISSUED", "Jeton de lecture émis"
+        PLAYBACK_FLAGGED = "PLAYBACK_FLAGGED", "Compte signalé (partage vidéo)"
 
     # `SET_NULL` : supprimer un compte admin ne doit jamais effacer la trace de ses
     # actions. `actor` est nul pour les actions du système (purge planifiée).

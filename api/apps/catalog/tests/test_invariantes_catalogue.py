@@ -109,6 +109,8 @@ def test_aucune_reponse_publique_ne_contient_d_url_de_fichier_video_brute(
     for reponse in reponses:
         corps = reponse.content.decode(errors="ignore")
         assert not MOTIF_VIDEO_BRUTE.search(corps), f"URL vidéo brute dans {corps[:200]}"
+        assert "video_provider_id" not in corps
+        assert "12345-abcde" not in corps
 
 
 def test_aucune_reponse_publique_n_expose_is_correct_ni_de_champ_interne(

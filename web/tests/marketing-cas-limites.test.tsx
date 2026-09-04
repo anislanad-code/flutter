@@ -20,7 +20,7 @@ const CHAPITRE: ChapitreGratuit = {
   title: "Installer Flutter",
   is_free: true,
   lesson: {
-    video_provider_id: "",
+    id: 1,
     duration_s: 480,
     transcript: "Un paragraphe.",
     resources: [],
@@ -188,32 +188,26 @@ describe("LecteurChapitre — contenu hostile ou incomplet", () => {
 
     // Le conteneur des blocs du transcript reste vide (le reste, c'est le lecteur).
     expect(html).toContain('<div class="flex flex-col gap-4"></div>');
-    expect(html).toContain("à venir");
+    expect(html).not.toContain("<video");
   });
 
-  it("affiche l'état d'attente tant qu'aucune vidéo n'est déposée", () => {
+  it("n'embarque aucune URL de fichier vidéo dans le HTML du SSR", () => {
     const html = renderToStaticMarkup(createElement(LecteurChapitre, { chapitre: CHAPITRE }));
 
     expect(html).not.toContain("<video");
-    expect(html).toContain("à venir");
+    expect(html).not.toMatch(/\.(mp4|m3u8|webm|mkv)\b/i);
+    expect(html).not.toContain("b-cdn.net");
+    expect(html).toContain("Chargement de la vidéo");
   });
 
-  it("ne fabrique jamais d'URL de fichier vidéo, même avec un identifiant renseigné", () => {
-    /* §4.1.1 — aucune URL de fichier vidéo ne transite vers le client. Le composant ne
-       doit pas dériver une source de `video_provider_id` : la lecture passera par une
-       URL signée émise par le serveur (`POST /api/lessons/{id}/playback`, étape 4). */
-    const avecVideo: ChapitreGratuit = {
-      ...CHAPITRE,
-      lesson: { ...CHAPITRE.lesson, video_provider_id: "12345-abcde" },
-    };
-
-    const html = renderToStaticMarkup(
-      createElement(LecteurChapitre, { chapitre: avecVideo }),
-    );
+  it("ne fabrique jamais d'URL de fichier à partir de l'identifiant de leçon", () => {
+    /* §4.1.1 — le composant ne dérive aucune source. La lecture passe par
+       `POST /api/lessons/{id}/playback` après hydratation. */
+    const html = renderToStaticMarkup(createElement(LecteurChapitre, { chapitre: CHAPITRE }));
 
     expect(html).not.toMatch(/\.(mp4|m3u8|webm|mkv)\b/i);
-    expect(html).not.toContain("12345-abcde");
-    expect(html).toContain("à venir");
+    expect(html).not.toContain("/videos/");
+    expect(html).not.toContain("bcdn_token");
   });
 });
 

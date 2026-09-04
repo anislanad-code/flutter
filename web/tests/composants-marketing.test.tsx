@@ -19,7 +19,7 @@ const CHAPITRE: ChapitreGratuit = {
   title: "Installer Flutter",
   is_free: true,
   lesson: {
-    video_provider_id: "",
+    id: 1,
     duration_s: 10,
     transcript: "Un paragraphe.\n\n## Un titre\n\nUn autre paragraphe.\n\n```\nflutter doctor\n```",
     resources: [{ titre: "flutter.dev", url: "https://flutter.dev" }],

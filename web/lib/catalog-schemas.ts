@@ -31,7 +31,7 @@ export const ressourceSchema = z.object({
 });
 
 export const leconSchema = z.object({
-  video_provider_id: z.string(),
+  id: z.number().int(),
   duration_s: z.number(),
   transcript: z.string(),
   resources: z.array(ressourceSchema),

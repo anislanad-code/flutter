@@ -1,9 +1,7 @@
 "use client";
 
-/* Lecteur vidéo du chapitre gratuit. Même composant qui sera durci à l'étape 4 pour
-   la vidéo protégée (watermark, coupure sur token expiré) — ici il n'y a rien à
-   protéger (le chapitre est gratuit), donc pas de watermark, mais le blocage du
-   téléchargement reste posé dès maintenant pour ne pas le reconstruire plus tard. */
+/* Placeholder « vidéo à venir ». La lecture réelle passe par LecteurSecurise
+   (jeton signé, filigrane). Ce composant n'est plus branché sur une URL de fichier. */
 
 type Props = {
   src: string | null;

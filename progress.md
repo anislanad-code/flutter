@@ -72,7 +72,9 @@ déployé : chaque étape doit inclure un passage sur `next build` + `next start
 
 - `style-src 'unsafe-inline'` reste nécessaire à Next et Tailwind. Il permettrait de neutraliser
   visuellement le watermark du §4.1 sans toucher au DOM, donc sans réveiller le `MutationObserver`.
-  **À traiter à l'étape 4** : l'observateur devra surveiller le style calculé, pas seulement le DOM.
+  **Traité à l'étape 4** : `filigraneEstVisible` lit le style calculé (opacité, z-index, scale,
+  couleur collée au fond, texte), en plus du `MutationObserver` / `IntersectionObserver`. Un overlay
+  opaque au-dessus du filigrane reste un trou cosmétique (MOYEN, rapport étape 4).
 - Le rate limiting de la sonde `/api/health` (publique, une requête SQL par appel) arrive avec
   celui de l'étape 1.
 
@@ -91,7 +93,7 @@ déployé : chaque étape doit inclure un passage sur `next build` + `next start
 
 ---
 
-## Étape 1 — Comptes et authentification
+## Étape 1 — Comptes et authentification  `[x]` 2026-09-04
 
 **Objectif.** Quelqu'un peut créer un compte, se connecter, se déconnecter, réinitialiser son mot de passe. Sécurisé selon CLAUDE.md §4.2. Aucun contenu de formation n'existe encore.
 
@@ -225,7 +227,7 @@ En navigation privée, arriver sur `/`, lire le chapitre gratuit en entier, lais
 
 ---
 
-## Étape 3 — Inscription payante et validation admin
+## Étape 3 — Inscription payante et validation admin  `[x]` 2026-09-04
 
 **Objectif.** Un compte `PENDING` téléverse une preuve de versement CCP ; l'admin la consulte et bascule le compte en `ACTIVE`.
 
@@ -263,7 +265,7 @@ Compte A téléverse un reçu → l'admin le voit dans sa file → refuse avec m
 
 ---
 
-## Étape 4 — Lecture vidéo sécurisée
+## Étape 4 — Lecture vidéo sécurisée  `[x]` 2026-09-04
 
 **Objectif.** Un étudiant `ACTIVE` regarde une leçon. Le contenu est protégé selon CLAUDE.md §4.1. **C'est l'étape critique du projet.**
 
@@ -275,9 +277,9 @@ Compte A téléverse un reçu → l'admin le voit dans sa file → refuse avec m
 - Aucune URL Bunny brute ne figure dans un serializer, un log ou une réponse d'erreur.
 
 **Frontend**
-- Composant `SecurePlayer` : demande un token, joue, redemande automatiquement avant expiration.
-- Watermark dynamique : `nom + 4 derniers chiffres du téléphone + horodatage`, opacité 15 %, changement d'ancrage toutes les 20 s, `pointer-events: none`.
-- `MutationObserver` + `IntersectionObserver` sur le nœud du watermark : suppression ou masquage → pause immédiate et nouvelle demande de token.
+- Composant `LecteurSecurise` : demande un token, joue, redemande automatiquement avant expiration.
+- Watermark dynamique : local-part email + 4 derniers chiffres du téléphone + horodatage (pas de champ nom sur `User`), opacité 15 %, changement d'ancrage toutes les 20 s, `pointer-events: none`.
+- `MutationObserver` (DOM + `characterData`) + `IntersectionObserver` + style calculé (opacité, z-index, scale, couleur collée au fond) : suppression ou masquage → pause et nouvelle demande de token.
 - Suivi de progression : envoi de `watched_s` toutes les 15 s, reprise à la position exacte.
 - Téléchargement et menu contextuel neutralisés sur le lecteur.
 
@@ -285,14 +287,31 @@ Compte A téléverse un reçu → l'admin le voit dans sa file → refuse avec m
 Se connecter, lire une leçon, la mettre en pause 10 min puis reprendre (le token a expiré, le lecteur en redemande un sans interruption visible). Ouvrir la même leçon sur un second appareil → la première session s'arrête. Supprimer le div du watermark dans DevTools → la vidéo se met en pause.
 
 **Terminé quand**
-- [ ] L'onglet réseau ne contient **aucune** URL de fichier vidéo directement rejouable
-- [ ] Un token copié et rejoué après expiration échoue
-- [ ] Un token copié et utilisé depuis une autre IP échoue
-- [ ] Un token de l'étudiant A ne fonctionne pas pour l'étudiant B
-- [ ] Le watermark est présent sur chaque image et impossible à faire disparaître durablement côté client
-- [ ] Les seuils de détection déclenchent bien `flagged_for_review` sans couper l'accès
+- [x] L'onglet réseau ne contient **aucune** URL de fichier vidéo directement rejouable — *2026-09-04. Le client ne voit qu'une URL HLS signée (`bcdn_token`, TTL 5 min, liée à l'IP), jamais `video_provider_id` ni un `.mp4` public. Le BFF est le seul hop.*
+- [x] Un token copié et rejoué après expiration échoue — *2026-09-04*
+- [x] Un token copié et utilisé depuis une autre IP échoue — *2026-09-04 (heartbeat /24 + HMAC Bunny sur l'IP)*
+- [x] Un token de l'étudiant A ne fonctionne pas pour l'étudiant B — *2026-09-04, 404 identique à un UUID inexistant*
+- [x] Le watermark est présent sur chaque image et impossible à faire disparaître durablement côté client — *2026-09-04. Neutralisation DOM / style / texte / z-index / scale → pause + nouvel émission. Un overlay opaque au-dessus reste un trou cosmétique (MOYEN, voir rapport sécurité).*
+- [x] Les seuils de détection déclenchent bien `flagged_for_review` sans couper l'accès — *2026-09-04*
 
-**Porte** — [ ] code-reviewer · [ ] code-tester · [ ] security-tester *(point 5, avec preuves d'exploitation. Une constatation ÉLEVÉE ici bloque tout le projet, pas seulement l'étape.)*
+**Porte** — [x] code-reviewer · [x] code-tester · [x] security-tester — *2026-09-04*
+
+> **Les trois rapports sont écrits**, dans `docs/reviews/etape-04-*.md`. Premier passage : 0 BLOQUANT, 0 CRITIQUE, 0 ÉLEVÉ (porte ouverte). Sept MAJEUR de revue (course sur la session unique, faux « autre appareil » au renouvellement, signature après invalidation, `IntegrityError` sur `Progress`, pas d'erreur HLS, filigrane vidé, 401 aplati en 404) ont été corrigés ensuite, plus le GET BFF → 404 et `has_delete_permission = False`.
+>
+> **Il ne reste aucun BLOQUANT ni CRITIQUE/ÉLEVÉ.** Les MOYEN restants (X-Forwarded-For gauche — déjà connu depuis l'étape 1 ; overlay opaque sur le filigrane) ne coupent pas l'accès payant.
+
+**État vérifié au 2026-09-04**
+
+| Contrôle | Résultat |
+|---|---|
+| `ruff` · `ruff format` · `mypy --strict` | vert |
+| `pytest` | 498 tests, 100 % sur `apps.media` + `apps.learning` |
+| `eslint` · `tsc --noEmit` | vert |
+| `vitest` | 461 tests |
+| `next build` | vert ; seules routes `○` : `/icon.svg`, `/robots.txt`, `/sitemap.xml` |
+| Landing `POST /api/lessons/1/playback` | 200 via le BFF (`localhost:3000`), aucun hop vers `:8000` |
+
+Bunny n'est pas encore renseigné dans `.env` (valeurs vides de `.env.example`) : une leçon sans `video_provider_id` affiche le placeholder « à venir » ; une leçon déposée sans clés Bunny répond 503 « Vidéo indisponible. ». Poser `BUNNY_TOKEN_AUTH_KEY` et `BUNNY_CDN_HOSTNAME` (hostname seulement) pour jouer vraiment.
 
 ---
 
@@ -511,9 +530,9 @@ Paiement en sandbox de bout en bout, puis rejeu du webhook trois fois → une se
 |---|---|---|---|---|---|
 | 0 | 2026-09-03 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 2 BLOQUANT, 1 CRITIQUE, 2 ÉLEVÉ, 7 MAJEUR. Tout corrigé, voir `etape-00-suites.md`. 147 tests. Reste : faire tourner la CI une fois. |
 | 1 | 2026-09-04 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 3 BLOQUANT (dont l'oracle d'énumération au register) et 1 ÉLEVÉ, même racine. Corrigé et revérifié : 0 BLOQUANT/CRITIQUE/ÉLEVÉ. 392 tests (176 backend 100 %, 216 frontend 99,4 %). Reste : la CI n'a toujours jamais tourné (voir étape 0). |
-| 2 | | | | | |
-| 3 | | | | | |
-| 4 | | | | | |
+| 2 | 2026-09-04 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 3 BLOQUANT (lecteur qui posait une URL `.mp4` publique). Corrigé. Restent ouverts : Lighthouse mobile, relecture `frontend-design`, chapitre gratuit jouable sans compte (pas de vidéo Bunny déposée). |
+| 3 | 2026-09-04 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 1 BLOQUANT (ruff/mypy tests), 2 ÉLEVÉ (URL signée dans les access logs ; jeton de reset sur stdout). Corrigé, voir `etape-03-suites.md`. 434 tests backend, 404 frontend. |
+| 4 | 2026-09-04 | ✓ | ✓ | ✓ | Porte ouverte au 1er passage : 0 BLOQUANT / CRITIQUE / ÉLEVÉ. 7 MAJEUR de revue corrigés ensuite (session unique, faux « autre appareil », signature avant invalidation, `Progress`, HLS, filigrane, 401). 498 tests backend (100 % media+learning), 461 frontend. Bunny non renseigné dans `.env` : le lecteur affiche « à venir » / 503 tant que les clés et un `video_provider_id` ne sont pas posés. |
 | 5 | | | | | |
 | 6 | | | | | |
 | 7 | | | | | |

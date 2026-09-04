@@ -1,4 +1,4 @@
-import { LecteurVideo } from "@/components/marketing/LecteurVideo";
+import { LecteurSecurise } from "@/components/course/LecteurSecurise";
 import type { Chapitre } from "@/lib/catalog-schemas";
 import { analyserTranscript } from "@/lib/markdown-leger";
 
@@ -16,12 +16,9 @@ export function LecteurChapitre({ chapitre }: Props) {
 
   return (
     <div className="flex flex-col gap-8">
-      {/* Aucune URL de fichier vidéo ne doit atteindre le client (§4.1.1) : pas de MP4
-          public ni servi par Django (§2). `video_provider_id` est l'identifiant Bunny —
-          la lecture réelle arrive à l'étape 4, via une URL signée émise par le serveur.
-          En attendant, `src` reste toujours `null` ; ce composant ne le fabrique jamais
-          lui-même. */}
-      <LecteurVideo src={null} titre={chapitre.title} />
+      {/* Aucune URL n'est construite ici. Le lecteur demande un jeton signé au BFF
+          (`POST /api/lessons/{id}/playback`) après hydratation, jamais pendant le SSR. */}
+      <LecteurSecurise lessonId={chapitre.lesson.id} titre={chapitre.title} />
 
       <div className="flex flex-col gap-4">
         {blocs.map((bloc, index) => {

@@ -5,14 +5,19 @@ from __future__ import annotations
 import logging
 import re
 
-# Query strings et corps d'email : token de reset, HMAC des preuves.
+# Query strings et corps d'email : token de reset, HMAC des preuves, jetons Bunny.
 _SECRETS = re.compile(
-    r"(?i)((?:signature|token)=)[^\s&\"'<>]+",
+    r"(?i)((?:signature|token|token_path|bcdn_token)=)[^\s&\"'<>]+",
+)
+_URL_CDN = re.compile(
+    r"https?://[^\s\"']+(?:\.b-cdn\.net|iframe\.mediadelivery\.net)[^\s\"']*",
+    re.IGNORECASE,
 )
 
 
 def rediger_secrets(texte: str) -> str:
-    return _SECRETS.sub(r"\1***", texte)
+    masque = _SECRETS.sub(r"\1***", texte)
+    return _URL_CDN.sub("https://***", masque)
 
 
 class RedactSecretsFilter(logging.Filter):

@@ -27,6 +27,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     last_activity_at = models.DateTimeField(null=True, blank=True)
     flagged_for_review = models.BooleanField(default=False)
+    # Compteur de lectures concurrentes (§4.1.5). Jamais un blocage automatique :
+    # on incrémente, on flague, l'admin décide.
+    concurrent_play_attempts = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(default=timezone.now)
 
     objects: ClassVar[UserManager] = UserManager()
