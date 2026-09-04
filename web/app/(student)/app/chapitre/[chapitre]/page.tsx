@@ -3,8 +3,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { LecteurChapitre } from "@/components/course/LecteurChapitre";
-import { recupererChapitreAuthentifie } from "@/lib/catalog";
+import {
+  recupererChapitreAuthentifie,
+  SLUG_FORMATION_PRINCIPALE,
+} from "@/lib/catalog";
 import { utilisateurCourant } from "@/lib/current-user";
+import { moduleDuChapitre, recupererPipeline } from "@/lib/progress";
 
 export const metadata: Metadata = {
   // Aucun titre tiré du chapitre : ce serait un oracle d'existence pour un contenu
@@ -29,8 +33,25 @@ export default async function PageChapitreEtudiant({ params }: Props) {
   const { chapitre: slug } = await params;
   if (!utilisateur) redirect(`/connexion?suite=/app/chapitre/${slug}`);
 
-  const chapitre = await recupererChapitreAuthentifie(slug);
+  const [chapitre, resultatPipeline] = await Promise.all([
+    recupererChapitreAuthentifie(slug),
+    recupererPipeline(SLUG_FORMATION_PRINCIPALE),
+  ]);
   if (!chapitre) notFound();
+
+  // Best-effort : si le pipeline n'a pas pu être chargé, la page reste utilisable —
+  // seul le bandeau de recommandation et l'état déjà-terminé du bouton en dépendent,
+  // jamais le droit de lire le chapitre (ça, c'est déjà tranché par Django ci-dessus).
+  const moduleDeCeChapitre = resultatPipeline.ok
+    ? moduleDuChapitre(resultatPipeline.pipeline, slug)
+    : null;
+  const recommandeApresOrdre =
+    moduleDeCeChapitre && !moduleDeCeChapitre.unlocked
+      ? moduleDeCeChapitre.recommande_apres_ordre
+      : null;
+  const dejaTermine =
+    moduleDeCeChapitre?.chapters.find((c) => c.slug === slug)?.state ===
+    "termine";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-5 py-16">
@@ -49,7 +70,29 @@ export default async function PageChapitreEtudiant({ params }: Props) {
         </p>
       </header>
 
-      <LecteurChapitre chapitre={chapitre} avecSuiviDeProgression />
+      {recommandeApresOrdre !== null ? (
+        <section
+          aria-labelledby="titre-recommandation"
+          className="flex flex-col gap-1 border-l-2 border-safran bg-paper py-1 pl-5"
+        >
+          <h2
+            id="titre-recommandation"
+            className="font-titre text-[length:var(--texte-base)] font-semibold text-ink"
+          >
+            Ce chapitre arrive avant l&apos;heure
+          </h2>
+          <p className="text-[length:var(--texte-sm)] text-ink">
+            Termine d&apos;abord le module {recommandeApresOrdre} — tu peux
+            quand même continuer ici si tu préfères.
+          </p>
+        </section>
+      ) : null}
+
+      <LecteurChapitre
+        chapitre={chapitre}
+        avecSuiviDeProgression
+        dejaTermine={dejaTermine}
+      />
     </main>
   );
 }

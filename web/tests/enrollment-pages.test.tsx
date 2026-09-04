@@ -2,6 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
+import type * as ProgressModule from "@/lib/progress";
+
 /* Les pages de l'étape 3.
 
    Ce qu'elles doivent prouver : une session manquante redirige, un compte non-admin
@@ -36,7 +38,10 @@ vi.mock("@/lib/catalog", () => ({
   recupererChapitreAuthentifie,
   SLUG_FORMATION_PRINCIPALE: "flutter-firebase-debutants",
 }));
-vi.mock("@/lib/progress", () => ({ recupererPipeline }));
+vi.mock("@/lib/progress", async (importOriginal) => {
+  const reel = await importOriginal<typeof ProgressModule>();
+  return { ...reel, recupererPipeline };
+});
 vi.mock("next/navigation", () => ({
   redirect,
   notFound,
@@ -125,13 +130,53 @@ const CHAPITRE = {
   course_title: "Flutter + Firebase",
 };
 
+/** Un pipeline minimal : un chapitre terminé, un disponible. */
+const pipelineDeTest = () => ({
+  ok: true as const,
+  pipeline: {
+    course_slug: "flutter-firebase-debutants",
+    resume_chapter_slug: "premier-widget",
+    modules: [
+      {
+        id: 1,
+        order: 0,
+        title: "Mise en route",
+        unlocked: true,
+        completed_chapters: 1,
+        total_chapters: 2,
+        recommande_apres_ordre: null,
+        chapters: [
+          {
+            id: 1,
+            slug: "installer-flutter",
+            order: 1,
+            title: "Installer Flutter",
+            is_free: true,
+            state: "termine" as const,
+          },
+          {
+            id: 2,
+            slug: "premier-widget",
+            order: 2,
+            title: "Ton premier widget",
+            is_free: false,
+            state: "disponible" as const,
+          },
+        ],
+      },
+    ],
+  },
+});
+
 beforeEach(() => {
   utilisateurCourant.mockReset().mockResolvedValue(ETUDIANTE);
   recupererEtatInscription.mockReset().mockResolvedValue(etat());
   recupererInscriptionsAdmin.mockReset().mockResolvedValue([]);
   recupererCours.mockReset().mockResolvedValue(COURS);
   recupererChapitreAuthentifie.mockReset().mockResolvedValue(null);
-  recupererPipeline.mockReset().mockResolvedValue(null);
+  recupererPipeline
+    .mockReset()
+    .mockResolvedValue({ ok: false, raison: "sans_session" });
   redirect.mockClear();
   notFound.mockClear();
 });
@@ -208,38 +253,7 @@ describe("/app — tableau de bord", () => {
     recupererEtatInscription.mockResolvedValue(
       etat({ status: "ACTIVE", depot_possible: false }),
     );
-    recupererPipeline.mockResolvedValue({
-      course_slug: "flutter-firebase-debutants",
-      resume_chapter_slug: "premier-widget",
-      modules: [
-        {
-          id: 1,
-          order: 0,
-          title: "Mise en route",
-          unlocked: true,
-          completed_chapters: 1,
-          total_chapters: 2,
-          chapters: [
-            {
-              id: 1,
-              slug: "installer-flutter",
-              order: 1,
-              title: "Installer Flutter",
-              is_free: true,
-              state: "termine",
-            },
-            {
-              id: 2,
-              slug: "premier-widget",
-              order: 2,
-              title: "Ton premier widget",
-              is_free: false,
-              state: "disponible",
-            },
-          ],
-        },
-      ],
-    });
+    recupererPipeline.mockResolvedValue(pipelineDeTest());
 
     render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
@@ -252,6 +266,93 @@ describe("/app — tableau de bord", () => {
   it("un compte non actif n'appelle jamais /api/progress", async () => {
     render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
     expect(recupererPipeline).not.toHaveBeenCalled();
+  });
+
+  it("un pipeline injoignable affiche une erreur honnête, jamais un parcours vidé en silence", async () => {
+    /* §6 : « Les erreurs disent quoi corriger, elles ne s'excusent pas ». Un incident
+       de lecture ne doit jamais se présenter comme « ta progression a été effacée » en
+       retombant silencieusement sur le parcours simple d'un compte non payant. */
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "ACTIVE", depot_possible: false }),
+    );
+    recupererPipeline.mockResolvedValue({ ok: false, raison: "indisponible" });
+
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("alert").textContent).toMatch(
+      /n'a pas pu être chargée/,
+    );
+    expect(screen.queryByRole("link", { name: "Reprendre" })).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "Ton premier widget" }),
+    ).toBeNull();
+  });
+
+  it("l'état du pipeline est redemandé au serveur à chaque rendu — jamais mémorisé", async () => {
+    /* Critère d'acceptation de l'étape 5 : l'état survit à un rechargement et à un
+       changement d'appareil. Il ne peut y arriver que si la page est dynamique et
+       recalcule côté serveur à chaque fois (§4.2 interdit tout stockage navigateur). */
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "ACTIVE", depot_possible: false }),
+    );
+    recupererPipeline.mockResolvedValue(pipelineDeTest());
+
+    expect(pageEtudiant.dynamic).toBe("force-dynamic");
+
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
+    cleanup();
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
+
+    expect(recupererPipeline).toHaveBeenCalledTimes(2);
+  });
+
+  it("le paramètre ?termine= désigne le nœud à animer, sans autre effet", async () => {
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "ACTIVE", depot_possible: false }),
+    );
+    recupererPipeline.mockResolvedValue(pipelineDeTest());
+
+    const { container } = render(
+      await pageEtudiant.default({
+        searchParams: Promise.resolve({ termine: "installer-flutter" }),
+      }),
+    );
+
+    expect(container.querySelectorAll(".noeud-vient-de-terminer")).toHaveLength(
+      1,
+    );
+  });
+
+  it("un ?termine= forgé pointant un chapitre inconnu n'anime rien et ne débloque rien", async () => {
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "ACTIVE", depot_possible: false }),
+    );
+    recupererPipeline.mockResolvedValue(pipelineDeTest());
+
+    const { container } = render(
+      await pageEtudiant.default({
+        searchParams: Promise.resolve({ termine: "chapitre-forge" }),
+      }),
+    );
+
+    expect(container.querySelector(".noeud-vient-de-terminer")).toBeNull();
+    // Le paramètre d'URL ne change jamais l'état affiché : il vient du serveur.
+    expect(screen.getByText(/— disponible/)).toBeTruthy();
+  });
+
+  it("le pipeline d'un compte actif n'expose aucun contenu de chapitre", async () => {
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "ACTIVE", depot_possible: false }),
+    );
+    recupererPipeline.mockResolvedValue(pipelineDeTest());
+
+    const { container } = render(
+      await pageEtudiant.default({ searchParams: Promise.resolve({}) }),
+    );
+
+    expect(container.innerHTML).not.toMatch(
+      /video_provider_id|transcript|\.m3u8|mediadelivery/,
+    );
   });
 
   it("catalogue injoignable : message honnête plutôt qu'une page cassée", async () => {
@@ -401,6 +502,92 @@ describe("/app/chapitre/[chapitre]", () => {
     expect(
       screen.getByRole("button", { name: "Marquer ce chapitre comme terminé" }),
     ).toBeTruthy();
+  });
+
+  it("affiche le bandeau de recommandation quand le module n'est pas encore déverrouillé", async () => {
+    recupererChapitreAuthentifie.mockResolvedValue(CHAPITRE);
+    recupererPipeline.mockResolvedValue({
+      ok: true,
+      pipeline: {
+        course_slug: "flutter-firebase-debutants",
+        resume_chapter_slug: null,
+        modules: [
+          {
+            id: 1,
+            order: 0,
+            title: "Mise en route",
+            unlocked: false,
+            completed_chapters: 0,
+            total_chapters: 1,
+            recommande_apres_ordre: 0,
+            chapters: [
+              {
+                id: 2,
+                slug: "premier-widget",
+                order: 1,
+                title: "Ton premier widget",
+                is_free: false,
+                state: "recommande_plus_tard",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(await pageChapitre.default({ params }));
+
+    expect(screen.getByText(/Termine d'abord le module 0/)).toBeTruthy();
+  });
+
+  it("n'affiche aucun bandeau quand le module du chapitre est déverrouillé", async () => {
+    recupererChapitreAuthentifie.mockResolvedValue(CHAPITRE);
+    recupererPipeline.mockResolvedValue(pipelineDeTest());
+
+    render(await pageChapitre.default({ params }));
+
+    expect(screen.queryByText(/Termine d'abord le module/)).toBeNull();
+  });
+
+  it("un chapitre déjà terminé n'invite pas à le refaire", async () => {
+    recupererChapitreAuthentifie.mockResolvedValue(CHAPITRE);
+    recupererPipeline.mockResolvedValue({
+      ok: true,
+      pipeline: {
+        course_slug: "flutter-firebase-debutants",
+        resume_chapter_slug: null,
+        modules: [
+          {
+            id: 1,
+            order: 0,
+            title: "Mise en route",
+            unlocked: true,
+            completed_chapters: 1,
+            total_chapters: 1,
+            recommande_apres_ordre: null,
+            chapters: [
+              {
+                id: 2,
+                slug: "premier-widget",
+                order: 1,
+                title: "Ton premier widget",
+                is_free: false,
+                state: "termine",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(await pageChapitre.default({ params }));
+
+    expect(screen.getByText("Chapitre déjà marqué terminé.")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", {
+        name: "Marquer ce chapitre comme terminé",
+      }),
+    ).toBeNull();
   });
 
   it("le titre de la page ne dévoile jamais le titre du chapitre", async () => {

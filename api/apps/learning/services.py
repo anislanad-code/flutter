@@ -1,9 +1,10 @@
 """Position de lecture et calcul du pipeline (CLAUDE.md §7 : jamais dans les vues).
 
 Le déverrouillage de modules est en **soft gating** (§2) : un module non recommandé
-reste entièrement accessible, l'état calculé ici ne sert qu'à l'affichage. Aucune
-fonction de ce module ne doit jamais être utilisée pour refuser un accès — c'est le
-rôle exclusif d'`apps.enrollment.services.a_acces_au_contenu` et du paywall (§4.4).
+reste entièrement accessible, l'état calculé ici ne sert qu'à l'affichage.
+`calculer_pipeline` consulte `a_acces_au_contenu` pour cette même raison — décider quel
+texte afficher — jamais pour refuser un accès : c'est le rôle exclusif des vues
+(`ChapterCompleteView`, `ChapterDetailView`) et du paywall (§4.4).
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog.models import Chapter, Course
+from apps.enrollment.services import a_acces_au_contenu
 from apps.learning.models import Progress
 
 # --- Position de lecture (étape 4) ------------------------------------------
@@ -68,10 +70,6 @@ def enregistrer_position(*, user: User, chapter: Chapter, watched_s: int, durati
 # --- Complétion et pipeline (étape 5) ---------------------------------------
 
 
-class ChapitreInaccessibleError(Exception):
-    """Le compte n'a pas le droit de voir ce chapitre. Traduit en 404 (§4.3, §4.4)."""
-
-
 def _duree(chapter: Chapter) -> int:
     lecon = getattr(chapter, "lesson", None)
     return lecon.duration_s if lecon is not None else 0
@@ -118,6 +116,10 @@ class EtatModule:
     completed_chapters: int
     total_chapters: int
     chapters: list[EtatChapitre]
+    # Ordre du module précédent, celui dont la complétion déverrouillerait celui-ci.
+    # `None` quand `unlocked` est vrai (rien à recommander). Sert à l'infobulle
+    # « Termine d'abord le module N » (§6) — jamais le module lui-même.
+    recommande_apres_ordre: int | None
 
 
 @dataclass(frozen=True)
@@ -127,23 +129,33 @@ class EtatPipeline:
     resume_chapter_slug: str | None
 
 
-def _etat_chapitre(progress_state: str | None, module_unlocked: bool) -> str:
+def _etat_chapitre(progress_state: str | None, module_unlocked: bool, accessible: bool) -> str:
     if progress_state == Progress.State.DONE:
         return "termine"
     if progress_state == Progress.State.IN_PROGRESS:
         return "en_cours"
-    return "disponible" if module_unlocked else "recommande_plus_tard"
+    return "disponible" if module_unlocked and accessible else "recommande_plus_tard"
 
 
 def calculer_pipeline(*, user: User, course: Course) -> EtatPipeline:
     """État de chaque nœud du serpentin pour `user`, calculé côté serveur (§6).
 
     Un module est déverrouillé (`unlocked`) si c'est le premier de la formation, ou si
-    tous les chapitres du module précédent sont `DONE`. Un module verrouillé reste
-    entièrement cliquable — `unlocked` ne pilote que l'opacité et l'infobulle
-    « recommandé plus tard », jamais un refus côté serveur (§2).
+    tous les chapitres du module précédent sont `DONE` (un module sans chapitre compte
+    comme complet : rien à y terminer ne doit pas verrouiller la suite indéfiniment).
+    Un module verrouillé reste entièrement cliquable — `unlocked` ne pilote que
+    l'opacité et l'infobulle « recommandé plus tard », jamais un refus côté serveur
+    (§2). Un chapitre payant qu'`user` n'a pas le droit de voir (§4.4) est traité comme
+    « recommandé plus tard » lui aussi : ce n'est ni un mensonge (il n'est pas
+    disponible tant que la formation n'est pas payée) ni une fuite (seuls titre et
+    ordre, déjà publics, sortent de ce point d'API).
     """
-    modules_qs = list(course.modules.all().order_by("order").prefetch_related("chapters"))
+    acces = a_acces_au_contenu(user, course)
+    # `.all()` seul, sans `.order_by()` : l'ordre déclaré par `Chapter.Meta.ordering`
+    # et `Module.Meta.ordering` s'applique déjà, et poser un `order_by` explicite ici
+    # invaliderait le cache de `prefetch_related` (Django le traite comme une requête
+    # différente) — la moitié du gain du prefetch partait en fumée pour rien.
+    modules_qs = list(course.modules.prefetch_related("chapters").all())
     etats = {
         (p.chapter_id): p.state
         for p in Progress.objects.filter(user=user, chapter__module__course=course)
@@ -151,18 +163,20 @@ def calculer_pipeline(*, user: User, course: Course) -> EtatPipeline:
 
     resultats: list[EtatModule] = []
     module_precedent_complet = True
+    ordre_module_precedent: int | None = None
     resume: tuple[int, str] | None = None  # (ordre_module, slug) du prochain nœud à reprendre
     resume_fallback: tuple[int, str] | None = None
 
     for mod in modules_qs:
-        chapitres = list(mod.chapters.all().order_by("order"))
+        chapitres = list(mod.chapters.all())
         unlocked = module_precedent_complet
 
         chapitre_etats: list[EtatChapitre] = []
         termines = 0
         for chap in chapitres:
             progress_state = etats.get(chap.id)
-            etat = _etat_chapitre(progress_state, unlocked)
+            accessible = acces or chap.is_free
+            etat = _etat_chapitre(progress_state, unlocked, accessible)
             chapitre_etats.append(EtatChapitre(chapter=chap, state=etat))
             if etat == "termine":
                 termines += 1
@@ -180,9 +194,11 @@ def calculer_pipeline(*, user: User, course: Course) -> EtatPipeline:
                 completed_chapters=termines,
                 total_chapters=len(chapitres),
                 chapters=chapitre_etats,
+                recommande_apres_ordre=None if unlocked else ordre_module_precedent,
             )
         )
-        module_precedent_complet = len(chapitres) > 0 and termines == len(chapitres)
+        module_precedent_complet = termines == len(chapitres)
+        ordre_module_precedent = mod.order
 
     return EtatPipeline(
         course_slug=course.slug,

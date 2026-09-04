@@ -1,7 +1,10 @@
 import Link from "next/link";
 
 import { NoeudPipeline } from "@/components/student/NoeudPipeline";
-import type { Pipeline as PipelineData } from "@/lib/progress-schemas";
+import type {
+  EtatNoeud,
+  Pipeline as PipelineData,
+} from "@/lib/progress-schemas";
 
 type Props = {
   pipeline: PipelineData;
@@ -13,7 +16,7 @@ type Props = {
    module, quatre états calculés côté serveur. Un module « recommandé plus tard »
    reste entièrement cliquable — soft gating (§2), jamais un cadenas. */
 
-const TEXTE_ETAT: Record<string, string> = {
+const TEXTE_ETAT: Record<EtatNoeud, string> = {
   termine: "terminé",
   en_cours: "en cours",
   disponible: "disponible",
@@ -46,6 +49,13 @@ export function Pipeline({ pipeline, chapitreVientDeTerminer }: Props) {
             mod.total_chapters > 0
               ? Math.round((mod.completed_chapters / mod.total_chapters) * 100)
               : 0;
+          // Le module précédent qui, une fois terminé, déverrouillerait celui-ci —
+          // jamais le module courant (§6 : « Passe d'abord l'examen du module N »
+          // désigne toujours un module antérieur, pas celui qu'on ouvre).
+          const recommandation =
+            !mod.unlocked && mod.recommande_apres_ordre !== null
+              ? `Termine d'abord le module ${mod.recommande_apres_ordre}.`
+              : null;
 
           return (
             <li key={mod.id}>
@@ -72,6 +82,12 @@ export function Pipeline({ pipeline, chapitreVientDeTerminer }: Props) {
                 />
               </div>
 
+              {recommandation ? (
+                <p className="mt-2 text-[length:var(--texte-xs)] text-muted">
+                  {recommandation}
+                </p>
+              ) : null}
+
               <ol className="mt-4 flex flex-col gap-3 border-l border-muted/40 pl-6">
                 {mod.chapters.map((chapitre) => (
                   <li
@@ -91,11 +107,6 @@ export function Pipeline({ pipeline, chapitreVientDeTerminer }: Props) {
                     <Link
                       href={`/app/chapitre/${chapitre.slug}`}
                       className="text-[length:var(--texte-base)] text-ink underline-offset-4 hover:underline"
-                      title={
-                        chapitre.state === "recommande_plus_tard"
-                          ? `Termine d'abord le module ${mod.order}.`
-                          : undefined
-                      }
                     >
                       {chapitre.title}
                       <span className="sr-only">
@@ -103,7 +114,7 @@ export function Pipeline({ pipeline, chapitreVientDeTerminer }: Props) {
                         — {TEXTE_ETAT[chapitre.state]}
                       </span>
                       {chapitre.state === "en_cours" ? (
-                        <span className="ml-2 text-[length:var(--texte-xs)] text-safran">
+                        <span className="ml-2 text-[length:var(--texte-xs)] text-ink">
                           tu en es ici
                         </span>
                       ) : null}

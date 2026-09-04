@@ -5,6 +5,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { ChampTexte } from "@/components/auth/ChampTexte";
 
+/* `//evil.example` commence par "/" mais résout en URL relative au protocole — une
+   redirection ouverte vers un domaine tiers après authentification (§4.2, esprit :
+   ne jamais offrir de tremplin à la prise de contrôle de compte). Un chemin interne
+   sûr commence par un seul "/", jamais par "//" ni par "/\". */
+function destinationSure(suite: string | null): string {
+  if (!suite) return "/app";
+  if (!suite.startsWith("/")) return "/app";
+  if (suite.startsWith("//") || suite.startsWith("/\\")) return "/app";
+  return suite;
+}
+
 export function FormulaireConnexion() {
   const router = useRouter();
   const parametres = useSearchParams();
@@ -34,8 +45,7 @@ export function FormulaireConnexion() {
         return;
       }
 
-      const suite = parametres.get("suite");
-      router.push(suite && suite.startsWith("/") ? suite : "/app");
+      router.push(destinationSure(parametres.get("suite")));
       router.refresh();
     } catch {
       setErreur("Impossible de contacter le serveur. Vérifie ta connexion.");

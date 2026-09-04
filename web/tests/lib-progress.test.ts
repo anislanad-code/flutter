@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/* Lecture serveur du pipeline (§5). Même garantie que `recupererChapitreAuthentifie` :
-   un corps hors schéma ou un statut non-200 redevient `null`, rien n'est reconstruit. */
+import type { Pipeline } from "@/lib/progress-schemas";
+
+/* Lecture serveur du pipeline (§5). `recupererPipeline` distingue « pas de session »
+   de « la lecture a échoué » — l'appelant ne doit jamais confondre l'un des deux avec
+   « rien n'a encore été fait » (§6, sinon un incident se présente comme un parcours
+   effacé). `moduleDuChapitre` est une fonction pure, testée séparément. */
 
 const apiFetch = vi.hoisted(() => vi.fn());
 const cookies = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({ apiFetch }));
 vi.mock("next/headers", () => ({ cookies }));
 
-const { recupererPipeline } = await import("@/lib/progress");
+const { recupererPipeline, moduleDuChapitre } = await import("@/lib/progress");
 
 const PIPELINE = {
   course_slug: "flutter-firebase-debutants",
@@ -21,6 +25,7 @@ const PIPELINE = {
       unlocked: true,
       completed_chapters: 0,
       total_chapters: 2,
+      recommande_apres_ordre: null,
       chapters: [
         {
           id: 1,
@@ -33,7 +38,7 @@ const PIPELINE = {
       ],
     },
   ],
-};
+} satisfies Pipeline;
 
 function avecSession(valeur: string | null): void {
   cookies.mockResolvedValue({
@@ -54,7 +59,10 @@ describe("recupererPipeline", () => {
 
     await expect(
       recupererPipeline("flutter-firebase-debutants"),
-    ).resolves.toEqual(PIPELINE);
+    ).resolves.toEqual({
+      ok: true,
+      pipeline: PIPELINE,
+    });
     expect(apiFetch.mock.calls[0]?.[0]).toBe(
       "/api/progress?course=flutter-firebase-debutants",
     );
@@ -68,26 +76,32 @@ describe("recupererPipeline", () => {
     expect(apiFetch.mock.calls[0]?.[2]).toEqual({ acceptStatuses: [401, 404] });
   });
 
-  it("sans session : null sans appeler Django", async () => {
+  it("sans session : raison distincte, sans appeler Django", async () => {
     avecSession(null);
 
     await expect(
       recupererPipeline("flutter-firebase-debutants"),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({
+      ok: false,
+      raison: "sans_session",
+    });
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("un 404 de Django reste un null", async () => {
+  it("un 404 de Django : indisponible, pas confondu avec sans_session", async () => {
     apiFetch.mockResolvedValue({
       ok: true,
       status: 404,
       data: { detail: "Not found." },
     });
 
-    await expect(recupererPipeline("cours-inexistant")).resolves.toBeNull();
+    await expect(recupererPipeline("cours-inexistant")).resolves.toEqual({
+      ok: false,
+      raison: "indisponible",
+    });
   });
 
-  it("un corps hors schéma donne null, jamais un pipeline partiel", async () => {
+  it("un corps hors schéma : indisponible, jamais un pipeline partiel", async () => {
     apiFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -96,10 +110,13 @@ describe("recupererPipeline", () => {
 
     await expect(
       recupererPipeline("flutter-firebase-debutants"),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({
+      ok: false,
+      raison: "indisponible",
+    });
   });
 
-  it("Django injoignable : null", async () => {
+  it("Django injoignable : indisponible", async () => {
     apiFetch.mockResolvedValue({
       ok: false,
       status: 503,
@@ -108,6 +125,21 @@ describe("recupererPipeline", () => {
 
     await expect(
       recupererPipeline("flutter-firebase-debutants"),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({
+      ok: false,
+      raison: "indisponible",
+    });
+  });
+});
+
+describe("moduleDuChapitre", () => {
+  it("trouve le module contenant le chapitre", () => {
+    expect(moduleDuChapitre(PIPELINE, "installer-flutter")).toEqual(
+      PIPELINE.modules[0],
+    );
+  });
+
+  it("renvoie null si le chapitre n'est dans aucun module", () => {
+    expect(moduleDuChapitre(PIPELINE, "chapitre-inconnu")).toBeNull();
   });
 });

@@ -80,7 +80,7 @@ def _a_le_droit(user: User | None, lecon: Lesson) -> bool:
         return True
     if user is None:
         return False
-    return enrollment_services.a_acces_au_contenu(user)
+    return enrollment_services.a_acces_au_contenu(user, chapitre.module.course)
 
 
 def _plafonner_emission(user: User | None, ip: str) -> None:

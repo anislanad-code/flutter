@@ -93,7 +93,9 @@ class ChapterDetailView(APIView):
         if not chapter.module.course.is_published:
             raise Http404
 
-        if not chapter.is_free and not enrollment_services.a_acces_au_contenu(request.user):
+        if not chapter.is_free and not enrollment_services.a_acces_au_contenu(
+            request.user, chapter.module.course
+        ):
             raise Http404
 
         return Response(ChapterDetailSerializer(chapter).data)

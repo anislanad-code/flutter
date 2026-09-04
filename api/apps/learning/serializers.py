@@ -24,6 +24,7 @@ class ModuleStateSerializer(serializers.Serializer[EtatModule]):
     completed_chapters = serializers.IntegerField()
     total_chapters = serializers.IntegerField()
     chapters = ChapterStateSerializer(many=True)
+    recommande_apres_ordre = serializers.IntegerField(allow_null=True)
 
 
 class PipelineSerializer(serializers.Serializer[EtatPipeline]):

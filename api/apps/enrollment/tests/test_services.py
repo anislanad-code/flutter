@@ -90,8 +90,26 @@ def test_inscription_de_cree_la_ligne_si_elle_manque(etudiant_b: User, cours: Co
     assert Enrollment.objects.filter(user=etudiant_b).count() == 1
 
 
-def test_a_acces_au_contenu_est_faux_sans_inscription(etudiant_b: User) -> None:
-    assert a_acces_au_contenu(etudiant_b) is False
+def test_a_acces_au_contenu_est_faux_sans_inscription(etudiant_b: User, cours: Course) -> None:
+    assert a_acces_au_contenu(etudiant_b, cours) is False
+
+
+def test_a_acces_au_contenu_est_faux_sur_une_autre_formation(
+    etudiante: User, cours: Course
+) -> None:
+    """§8 relecture étape 5, ÉLEVÉ E1 : une inscription active sur une formation ne
+    donne accès à aucune autre — `a_acces_au_contenu` prend la formation en argument,
+    pas seulement le compte."""
+    Enrollment.objects.create(user=etudiante, course=cours, status=Enrollment.Status.ACTIVE)
+    autre_formation = Course.objects.create(
+        slug="react-native-avance",
+        title="React Native avancé",
+        description="Une deuxième formation.",
+        is_published=True,
+    )
+
+    assert a_acces_au_contenu(etudiante, cours) is True
+    assert a_acces_au_contenu(etudiante, autre_formation) is False
 
 
 def test_etat_inscription_sans_cours_expose_quand_meme_les_instructions(

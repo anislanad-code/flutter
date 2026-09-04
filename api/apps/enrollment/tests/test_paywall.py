@@ -98,10 +98,11 @@ def test_l_inscription_d_un_autre_compte_n_ouvre_rien(
 
     _activer(etudiante)
     client_b = connecter(api_client, etudiant_b)
+    cours = chapitre_payant.module.course
 
     assert client_b.get(f"/api/chapters/{chapitre_payant.slug}").status_code == 404
-    assert a_acces_au_contenu(etudiant_b) is False
-    assert a_acces_au_contenu(etudiante) is True
+    assert a_acces_au_contenu(etudiant_b, cours) is False
+    assert a_acces_au_contenu(etudiante, cours) is True
 
 
 def test_un_chapitre_d_un_cours_non_publie_reste_invisible(

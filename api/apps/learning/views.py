@@ -6,6 +6,8 @@ toujours celle de `request.user` (§8 checklist IDOR : rien à énumérer ici).
 
 from __future__ import annotations
 
+import re
+
 from django.http import Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -21,6 +23,11 @@ from apps.learning.serializers import ChapterCompleteResponseSerializer, Pipelin
 
 MESSAGE_TROP_DE_TENTATIVES = "Trop de tentatives. Réessaie plus tard."
 
+# Même alphabet qu'un `SlugField` Django. Rejeter ce qui ne correspond pas avant de
+# toucher la base évite qu'un octet NUL ou un caractère de contrôle atteigne le pilote
+# PostgreSQL, qui lève une exception non gérée (500) plutôt qu'un 404 propre.
+FORME_SLUG = re.compile(r"^[-a-zA-Z0-9_]+$")
+
 
 class ProgressView(APIView):
     """GET /api/progress?course=<slug> — état de chaque nœud pour le compte courant."""
@@ -29,11 +36,19 @@ class ProgressView(APIView):
 
     def get(self, request: Request) -> Response:
         assert isinstance(request.user, User)
-        slug = request.query_params.get("course", "")
+
         try:
-            course = Course.objects.prefetch_related("modules__chapters__lesson").get(
-                slug=slug, is_published=True
+            enforce_rate_limit(
+                "progress:read", str(request.user.pk), max_attempts=60, window_seconds=60
             )
+        except TropDeTentativesError:
+            return Response({"detail": MESSAGE_TROP_DE_TENTATIVES}, status=429)
+
+        slug = request.query_params.get("course", "")
+        if not FORME_SLUG.match(slug):
+            raise Http404
+        try:
+            course = Course.objects.get(slug=slug, is_published=True)
         except Course.DoesNotExist:
             raise Http404 from None
 
@@ -68,7 +83,9 @@ class ChapterCompleteView(APIView):
 
         # Même règle que le paywall (§4.4) : marquer terminé un chapitre qu'on n'a pas
         # le droit de voir n'apprend rien de plus qu'essayer de le lire — 404, pas 403.
-        if not chapter.is_free and not enrollment_services.a_acces_au_contenu(request.user):
+        if not chapter.is_free and not enrollment_services.a_acces_au_contenu(
+            request.user, chapter.module.course
+        ):
             raise Http404
 
         services.terminer_chapitre(user=request.user, chapter=chapter)

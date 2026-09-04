@@ -86,13 +86,21 @@ def inscription_de(user: User) -> Enrollment:
     return inscription
 
 
-def a_acces_au_contenu(user: User) -> bool:
-    """Vrai seulement pour une inscription `ACTIVE` (§4.4).
+def a_acces_au_contenu(user: User, course: Course) -> bool:
+    """Vrai seulement pour une inscription `ACTIVE` **sur cette formation précise** (§4.4).
 
     Utilisé par le catalogue pour décider si un chapitre payant peut être servi. Un
     compte `PENDING`, `BLOCKED` ou `EXPIRED` n'a droit qu'aux chapitres `is_free`.
+
+    Prend `course` en argument, pas seulement `user` : `Enrollment` est par `(user,
+    course)` (§5), donc « ce compte a une inscription active » et « ce compte a une
+    inscription active sur la formation de ce chapitre » sont deux questions
+    différentes. La plateforme accueillera d'autres formations (§1) — un étudiant
+    actif sur l'une ne doit jamais obtenir gratuitement le contenu d'une autre.
     """
-    return Enrollment.objects.filter(user=user, status=Enrollment.Status.ACTIVE).exists()
+    return Enrollment.objects.filter(
+        user=user, course=course, status=Enrollment.Status.ACTIVE
+    ).exists()
 
 
 @dataclass(frozen=True)

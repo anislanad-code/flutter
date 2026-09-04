@@ -315,34 +315,54 @@ Bunny n'est pas encore renseigné dans `.env` (valeurs vides de `.env.example`) 
 
 ---
 
-## Étape 5 — Parcours et progression (le pipeline)
+## Étape 5 — Parcours et progression (le pipeline)  `[x]` 2026-09-04
 
-**Objectif.** L'étudiant voit son parcours en serpentin, navigue entre chapitres et modules, et sa progression est enregistrée. **Soft gating** : rien n'est jamais verrouillé côté serveur pour un compte actif.
+**Objectif.** L'étudiant voit son parcours, navigue entre chapitres et modules, et sa progression est enregistrée. **Soft gating** : rien n'est jamais verrouillé côté serveur pour un compte actif.
 
 **Backend**
-- `Progress`, `ModuleCompletion`. `GET /api/progress` renvoie l'état de chaque chapitre pour l'utilisateur courant.
-- `POST /api/chapters/{id}/complete` — marque terminé, calcule l'état du module.
-- Calcul de l'état affiché de chaque nœud : `terminé` / `en cours` / `disponible` / `recommandé plus tard`. La logique est côté serveur, le front ne fait qu'afficher.
-- `last_activity_at` mis à jour à chaque appel authentifié.
+- `Progress`, `ModuleCompletion` (posée pour l'étape 6 : `exam_passed` reste faux tant qu'il n'y a pas de vrai QCM). `GET /api/progress?course=<slug>` renvoie l'état de chaque chapitre pour l'utilisateur courant.
+- `POST /api/chapters/{slug}/complete` — marque terminé, idempotent. (La route prend le slug, pas un id numérique — cohérent avec le reste du catalogue.)
+- Calcul de l'état affiché de chaque nœud : `terminé` / `en cours` / `disponible` / `recommandé plus tard`. La logique est côté serveur, le front ne fait qu'afficher. Un chapitre payant qu'un compte n'a pas le droit de voir est traité comme « recommandé plus tard » lui aussi (ni fuite, ni mensonge).
+- Le paywall (`a_acces_au_contenu`) est scopé par formation `(user, course)`, pas seulement par compte — corrigé pendant la porte (§4.4, ÉLEVÉ E1 du rapport sécurité : une inscription active sur une formation ne devait jamais ouvrir le contenu d'une autre).
+- `last_activity_at` mis à jour à chaque appel authentifié (déjà en place depuis l'étape 1).
 
 **Frontend**
-- Composant `Pipeline` : serpentin vertical, nœuds groupés par module, quatre états visuels du §6.
-- Un nœud `recommandé plus tard` est à 45 % d'opacité, **cliquable**, avec une infobulle expliquant la recommandation. Aucun cadenas, aucun blocage.
-- Une seule animation dans toute l'app : le passage d'un nœud à l'état terminé.
-- Barre de progression par module. Bouton « Reprendre » qui ouvre le dernier chapitre en cours.
-- Responsive à partir de 360 px : le serpentin reste lisible sur un écran étroit.
+- Composant `Pipeline` : chemin vertical, nœuds groupés par module, quatre états visuels du §6.
+- Un nœud `recommandé plus tard` est à 45 % d'opacité, **cliquable**. La recommandation (« Termine d'abord le module N ») est un texte visible en permanence sous la barre de progression du module — pas une infobulle `title`, invisible au clavier et au tactile.
+- Une seule animation dans toute l'app : le passage d'un nœud à l'état terminé, pilotée par `?termine=` (jamais de stockage navigateur, §4.2).
+- Barre de progression par module. Bouton « Reprendre » / « Commencer » qui ouvre le chapitre en cours ou le premier disponible.
+- Bandeau de recommandation sur la page de chapitre elle-même quand son module n'est pas déverrouillé.
+- Responsive à partir de 360 px.
 
 **Intégration**
-Terminer trois chapitres d'affilée et voir le serpentin se remplir. Cliquer sur un module non recommandé → il s'ouvre, avec un bandeau de recommandation, pas une erreur. Recharger → l'état est identique. Ouvrir sur mobile 360 px → utilisable.
+Terminer trois chapitres d'affilée et voir le pipeline se remplir. Cliquer sur un module non recommandé → il s'ouvre, avec un bandeau de recommandation, pas une erreur. Recharger → l'état est identique. Ouvrir sur mobile 360 px → utilisable.
 
 **Terminé quand**
-- [ ] Aucun endpoint ne renvoie 403 pour un chapitre non terminé sur un compte `ACTIVE`
-- [ ] L'état du pipeline survit à un rechargement et à un changement d'appareil
-- [ ] Navigation complète au clavier avec focus visible
-- [ ] `prefers-reduced-motion` désactive l'animation de complétion
-- [ ] L'étudiant A ne peut pas lire ni modifier la progression de B
+- [x] Aucun endpoint ne renvoie 403 pour un chapitre non terminé sur un compte `ACTIVE` — *2026-09-04*
+- [x] L'état du pipeline survit à un rechargement et à un changement d'appareil — *2026-09-04*
+- [x] Navigation complète au clavier avec focus visible — *2026-09-04*
+- [x] `prefers-reduced-motion` désactive l'animation de complétion — *2026-09-04*
+- [x] L'étudiant A ne peut pas lire ni modifier la progression de B — *2026-09-04*
 
-**Porte** — [ ] code-reviewer · [ ] code-tester · [ ] security-tester *(points 1 et 3)*
+**Porte** — [x] code-reviewer · [x] code-tester · [x] security-tester *(points 1 et 3)* — *2026-09-04*
+
+> Premier passage : **2 BLOQUANT, 1 ÉLEVÉ, 12 MAJEUR, 4 MOYEN**. Tous les BLOQUANT et l'ÉLEVÉ ont
+> été corrigés et revérifiés : contraste AA de « tu en es ici » (safran → ink), bandeau de
+> recommandation sur la page de chapitre, et surtout le paywall scopé par formation (voir Backend
+> ci-dessus). Une bonne partie des MAJEUR/MOYEN a été corrigée dans la foulée : l'infobulle désigne
+> maintenant le bon module et reste visible sans survol, requêtes N+1 du pipeline supprimées, module
+> vide ne verrouille plus la suite indéfiniment, `GET /api/progress` plafonné et validé contre un
+> paramètre malformé, redirection ouverte `?suite=//evil.example` fermée, admin Django de la
+> progression verrouillé en lecture seule avec traçabilité. **Il ne reste aucun BLOQUANT ni
+> CRITIQUE/ÉLEVÉ.**
+>
+> **Reporté explicitement, avec l'accord requis du §6 encore à obtenir avant d'y toucher** : le
+> pipeline est aujourd'hui une liste verticale à filet gauche, pas le serpentin décrit au §6 —
+> écart signalé par la revue, non corrigé unilatéralement (voir `docs/reviews/etape-05-code-reviewer.md`
+> MAJEUR 8). `ParcoursEtudiant` (compte non actif) et `Pipeline` (compte actif) restent deux
+> composants qui divergent visuellement (MAJEUR 7) ; le rafraîchissement silencieux de session
+> annoncé par l'étape 1 n'est toujours pas construit, seul un renvoi propre vers `/connexion` sur 401
+> a été ajouté (MAJEUR 12).
 
 ---
 
@@ -533,7 +553,7 @@ Paiement en sandbox de bout en bout, puis rejeu du webhook trois fois → une se
 | 2 | 2026-09-04 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 3 BLOQUANT (lecteur qui posait une URL `.mp4` publique). Corrigé. Restent ouverts : Lighthouse mobile, relecture `frontend-design`, chapitre gratuit jouable sans compte (pas de vidéo Bunny déposée). |
 | 3 | 2026-09-04 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 1 BLOQUANT (ruff/mypy tests), 2 ÉLEVÉ (URL signée dans les access logs ; jeton de reset sur stdout). Corrigé, voir `etape-03-suites.md`. 434 tests backend, 404 frontend. |
 | 4 | 2026-09-04 | ✓ | ✓ | ✓ | Porte ouverte au 1er passage : 0 BLOQUANT / CRITIQUE / ÉLEVÉ. 7 MAJEUR de revue corrigés ensuite (session unique, faux « autre appareil », signature avant invalidation, `Progress`, HLS, filigrane, 401). 498 tests backend (100 % media+learning), 461 frontend. Bunny non renseigné dans `.env` : le lecteur affiche « à venir » / 503 tant que les clés et un `video_provider_id` ne sont pas posés. |
-| 5 | | | | | |
+| 5 | 2026-09-04 | ✓ | ✓ | ✓ | Porte fermée au 1er passage : 2 BLOQUANT, 1 ÉLEVÉ, 12 MAJEUR, 4 MOYEN. BLOQUANT+ÉLEVÉ corrigés (contraste, bandeau de recommandation, paywall scopé par formation). Serpentin visuel et unification `ParcoursEtudiant`/`Pipeline` reportés (accord §6 requis). |
 | 6 | | | | | |
 | 7 | | | | | |
 | 8 | | | | | |

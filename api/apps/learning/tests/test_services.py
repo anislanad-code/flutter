@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from apps.accounts.models import User
 from apps.catalog.models import Chapter, Course, Module
+from apps.enrollment.models import Enrollment
 from apps.learning import services
 from apps.learning.models import Progress
 
@@ -16,7 +17,12 @@ def test_premier_module_toujours_deverrouille(
 
 
 def test_chapitre_non_commence_dans_module_deverrouille_est_disponible(
-    etudiante: User, cours: Course, module_0: Module, chapitre_0a: Chapter, chapitre_0b: Chapter
+    etudiante: User,
+    inscription_active: Enrollment,
+    cours: Course,
+    module_0: Module,
+    chapitre_0a: Chapter,
+    chapitre_0b: Chapter,
 ) -> None:
     pipeline = services.calculer_pipeline(user=etudiante, course=cours)
     etats = {c.chapter.slug: c.state for c in pipeline.modules[0].chapters}
@@ -41,6 +47,7 @@ def test_module_suivant_recommande_tant_que_le_precedent_nest_pas_termine(
 
 def test_module_suivant_se_deverrouille_quand_tous_les_chapitres_precedents_sont_termines(
     etudiante: User,
+    inscription_active: Enrollment,
     cours: Course,
     module_0: Module,
     module_1: Module,

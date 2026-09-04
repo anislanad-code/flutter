@@ -13,11 +13,15 @@ type Props = {
   /** Faux sur `/gratuit/[chapitre]` (visiteur anonyme, pas de progression à suivre) ;
    *  vrai sur `/app/chapitre/[chapitre]` (compte connecté, §5). */
   avecSuiviDeProgression?: boolean;
+  /** Vrai si le pipeline dit déjà ce chapitre `termine` — évite au bouton de proposer
+   *  de le marquer terminé une seconde fois et de rejouer l'animation pour rien. */
+  dejaTermine?: boolean;
 };
 
 export function LecteurChapitre({
   chapitre,
   avecSuiviDeProgression = false,
+  dejaTermine = false,
 }: Props) {
   const blocs = analyserTranscript(chapitre.lesson.transcript);
 
@@ -83,7 +87,10 @@ export function LecteurChapitre({
 
       {avecSuiviDeProgression ? (
         <div className="border-t border-muted/40 pt-6">
-          <BoutonTerminerChapitre chapitreSlug={chapitre.slug} />
+          <BoutonTerminerChapitre
+            chapitreSlug={chapitre.slug}
+            dejaTermine={dejaTermine}
+          />
         </div>
       ) : null}
     </div>

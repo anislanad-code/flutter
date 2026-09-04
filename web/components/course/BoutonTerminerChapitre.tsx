@@ -5,16 +5,22 @@ import { useState } from "react";
 
 type Props = {
   chapitreSlug: string;
+  /** Le pipeline dit déjà ce chapitre `termine` au chargement de la page : le bouton
+   *  ne se propose pas de le refaire, et l'animation de complétion ne rejoue pas. */
+  dejaTermine?: boolean;
 };
 
 /* Un bouton dit ce qu'il fait, le message de succès reprend le même verbe (§6).
    Le retour vers `/app?termine=<slug>` signale au pipeline quel nœud vient de passer
    à `terminé`, pour jouer l'unique animation de l'app — en paramètre d'URL, jamais en
    stockage navigateur (interdit hors authentification par CLAUDE.md §4.2). */
-export function BoutonTerminerChapitre({ chapitreSlug }: Props) {
+export function BoutonTerminerChapitre({
+  chapitreSlug,
+  dejaTermine = false,
+}: Props) {
   const router = useRouter();
   const [etat, setEtat] = useState<"repos" | "en_cours" | "termine" | "erreur">(
-    "repos",
+    dejaTermine ? "termine" : "repos",
   );
 
   async function marquerTermine(): Promise<void> {
@@ -26,6 +32,16 @@ export function BoutonTerminerChapitre({ chapitreSlug }: Props) {
           method: "POST",
         },
       );
+      if (reponse.status === 401) {
+        // La session a expiré pendant la lecture (un chapitre dépasse souvent les
+        // 15 min de l'access token) : « réessaie » serait un conseil faux, puisque
+        // réessayer échouerait pareil. On renvoie vers la connexion en conservant la
+        // destination, comme partout ailleurs dans l'espace étudiant.
+        router.push(
+          `/connexion?suite=${encodeURIComponent(`/app/chapitre/${chapitreSlug}`)}`,
+        );
+        return;
+      }
       if (!reponse.ok) {
         setEtat("erreur");
         return;
@@ -39,8 +55,10 @@ export function BoutonTerminerChapitre({ chapitreSlug }: Props) {
 
   if (etat === "termine") {
     return (
-      <p className="text-[length:var(--texte-base)] text-zellige">
-        Chapitre marqué terminé.
+      <p role="status" className="text-[length:var(--texte-base)] text-zellige">
+        {dejaTermine
+          ? "Chapitre déjà marqué terminé."
+          : "Chapitre marqué terminé."}
       </p>
     );
   }
@@ -58,7 +76,7 @@ export function BoutonTerminerChapitre({ chapitreSlug }: Props) {
           : "Marquer ce chapitre comme terminé"}
       </button>
       {etat === "erreur" ? (
-        <p className="text-[length:var(--texte-sm)] text-danger">
+        <p role="alert" className="text-[length:var(--texte-sm)] text-danger">
           Impossible d&apos;enregistrer pour l&apos;instant. Réessaie dans un
           instant.
         </p>

@@ -8,7 +8,7 @@ import { Pipeline } from "@/components/student/Pipeline";
 import { recupererCours, SLUG_FORMATION_PRINCIPALE } from "@/lib/catalog";
 import { utilisateurCourant } from "@/lib/current-user";
 import { recupererEtatInscription } from "@/lib/enrollment";
-import { recupererPipeline } from "@/lib/progress";
+import { recupererPipeline, type ResultatPipeline } from "@/lib/progress";
 
 export const metadata: Metadata = {
   title: "Ton espace — anis.dev",
@@ -29,20 +29,21 @@ export default async function PageEspaceEtudiant({ searchParams }: Props) {
 
   const { termine } = await searchParams;
 
-  const [etat, cours] = await Promise.all([
-    recupererEtatInscription(),
-    recupererCours(SLUG_FORMATION_PRINCIPALE),
-  ]);
-
+  // `cours` part sans attendre `etat` : il n'en dépend pas, ce serait le sérialiser
+  // pour rien. `pipeline`, lui, ne se déclenche qu'une fois `statut` connu.
+  const coursPromise = recupererCours(SLUG_FORMATION_PRINCIPALE);
+  const etat = await recupererEtatInscription();
   const statut = etat?.status ?? "PENDING";
   const preuve = etat?.derniere_preuve ?? null;
   // Le pipeline complet (§5) n'a de sens que pour un compte qui a vraiment accès à
   // toute la formation — pour un compte `PENDING`, `ParcoursEtudiant` suffit déjà à
   // montrer le chapitre gratuit ouvert et le reste grisé par le paywall (§3).
-  const pipeline =
+  const [cours, resultatPipeline] = await Promise.all([
+    coursPromise,
     statut === "ACTIVE"
-      ? await recupererPipeline(SLUG_FORMATION_PRINCIPALE)
-      : null;
+      ? recupererPipeline(SLUG_FORMATION_PRINCIPALE)
+      : Promise.resolve<ResultatPipeline | null>(null),
+  ]);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-10 px-5 py-16">
@@ -108,8 +109,16 @@ export default async function PageEspaceEtudiant({ searchParams }: Props) {
         </section>
       ) : null}
 
-      {pipeline ? (
-        <Pipeline pipeline={pipeline} chapitreVientDeTerminer={termine} />
+      {resultatPipeline?.ok ? (
+        <Pipeline
+          pipeline={resultatPipeline.pipeline}
+          chapitreVientDeTerminer={termine}
+        />
+      ) : resultatPipeline?.raison === "indisponible" ? (
+        <p role="alert" className="text-[length:var(--texte-base)] text-danger">
+          Ta progression n&apos;a pas pu être chargée. Recharge la page — rien
+          n&apos;a été effacé.
+        </p>
       ) : cours ? (
         <ParcoursEtudiant cours={cours} statut={statut} />
       ) : (

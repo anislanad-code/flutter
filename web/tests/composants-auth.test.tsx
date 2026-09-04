@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 /* Les quatre formulaires d'auth et le bouton de déconnexion. Pour chacun : rendu,
@@ -17,15 +23,16 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { ChampTexte } = await import("@/components/auth/ChampTexte");
-const { FormulaireConnexion } = await import("@/components/auth/FormulaireConnexion");
-const { FormulaireInscription } = await import("@/components/auth/FormulaireInscription");
-const { FormulaireMotDePasseOublie } = await import(
-  "@/components/auth/FormulaireMotDePasseOublie"
-);
-const { FormulaireNouveauMotDePasse } = await import(
-  "@/components/auth/FormulaireNouveauMotDePasse"
-);
-const { BoutonDeconnexion } = await import("@/components/auth/BoutonDeconnexion");
+const { FormulaireConnexion } =
+  await import("@/components/auth/FormulaireConnexion");
+const { FormulaireInscription } =
+  await import("@/components/auth/FormulaireInscription");
+const { FormulaireMotDePasseOublie } =
+  await import("@/components/auth/FormulaireMotDePasseOublie");
+const { FormulaireNouveauMotDePasse } =
+  await import("@/components/auth/FormulaireNouveauMotDePasse");
+const { BoutonDeconnexion } =
+  await import("@/components/auth/BoutonDeconnexion");
 
 /** Une réponse qui ne se résout que sur demande : sert à observer l'état de chargement. */
 function reponseSuspendue() {
@@ -47,7 +54,11 @@ function reponse(status: number, corps: unknown = {}): Response {
 const fetchMock = vi.fn();
 
 /** L'appel `fetch` du composant : URL et corps JSON, sans indexation non typée. */
-function appelFetch(index = 0): { url: string; init: RequestInit; corps: unknown } {
+function appelFetch(index = 0): {
+  url: string;
+  init: RequestInit;
+  corps: unknown;
+} {
   const appel = fetchMock.mock.calls.at(index);
   if (!appel) throw new Error("fetch n'a pas été appelé");
   const init = (appel[1] ?? {}) as RequestInit;
@@ -74,7 +85,9 @@ afterEach(() => {
 describe("ChampTexte", () => {
   it("relie le label à l'input et remonte la saisie", async () => {
     const onChange = vi.fn();
-    render(<ChampTexte id="email" label="Email" value="" onChange={onChange} />);
+    render(
+      <ChampTexte id="email" label="Email" value="" onChange={onChange} />,
+    );
 
     const input = screen.getByLabelText("Email");
     expect(input).toHaveProperty("required", true);
@@ -99,7 +112,9 @@ describe("ChampTexte", () => {
     const input = screen.getByLabelText("Mot de passe");
     expect(input.getAttribute("aria-invalid")).toBe("true");
     expect(input.getAttribute("aria-describedby")).toBe("password-erreur");
-    expect(screen.getByText("Au moins 10 caractères.").id).toBe("password-erreur");
+    expect(screen.getByText("Au moins 10 caractères.").id).toBe(
+      "password-erreur",
+    );
     expect(input).toHaveProperty("required", false);
   });
 });
@@ -116,8 +131,14 @@ describe("FormulaireConnexion", () => {
     fetchMock.mockResolvedValue(reponse(200));
     render(<FormulaireConnexion />);
 
-    await userEvent.type(screen.getByLabelText("Email"), "etudiante@example.com");
-    await userEvent.type(screen.getByLabelText("Mot de passe"), "motdepasse-long");
+    await userEvent.type(
+      screen.getByLabelText("Email"),
+      "etudiante@example.com",
+    );
+    await userEvent.type(
+      screen.getByLabelText("Mot de passe"),
+      "motdepasse-long",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Se connecter" }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/app"));
@@ -149,8 +170,28 @@ describe("FormulaireConnexion", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/app"));
   });
 
+  it("ignore un ?suite=//evil.example (URL relative au protocole, même piège que l'absolu)", async () => {
+    parametres.set("suite", "//evil.example");
+    fetchMock.mockResolvedValue(reponse(200));
+    render(<FormulaireConnexion />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Se connecter" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/app"));
+  });
+
+  it("ignore un ?suite=/\\evil.example (certains navigateurs le traitent comme //)", async () => {
+    parametres.set("suite", "/\\evil.example");
+    fetchMock.mockResolvedValue(reponse(200));
+    render(<FormulaireConnexion />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Se connecter" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/app"));
+  });
+
   it("401 : message unique qui ne distingue pas email inconnu et mauvais mot de passe", async () => {
-    fetchMock.mockResolvedValue(reponse(401, { detail: "Identifiants incorrects." }));
+    fetchMock.mockResolvedValue(
+      reponse(401, { detail: "Identifiants incorrects." }),
+    );
     render(<FormulaireConnexion />);
 
     await userEvent.click(screen.getByRole("button", { name: "Se connecter" }));
@@ -166,7 +207,9 @@ describe("FormulaireConnexion", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Se connecter" }));
     const alerte = await screen.findByRole("alert");
-    expect(alerte.textContent).toBe("Trop de tentatives. Réessaie dans quelques minutes.");
+    expect(alerte.textContent).toBe(
+      "Trop de tentatives. Réessaie dans quelques minutes.",
+    );
   });
 
   it("réseau coupé : message qui dit quoi vérifier", async () => {
@@ -175,7 +218,9 @@ describe("FormulaireConnexion", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Se connecter" }));
     const alerte = await screen.findByRole("alert");
-    expect(alerte.textContent).toBe("Impossible de contacter le serveur. Vérifie ta connexion.");
+    expect(alerte.textContent).toBe(
+      "Impossible de contacter le serveur. Vérifie ta connexion.",
+    );
   });
 
   it("état de chargement : bouton désactivé et libellé « Connexion… »", async () => {
@@ -216,9 +261,13 @@ describe("FormulaireConnexion", () => {
     await userEvent.tab();
     expect(document.activeElement).toBe(screen.getByLabelText("Mot de passe"));
     await userEvent.tab();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Se connecter" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Se connecter" }),
+    );
     await userEvent.tab();
-    expect(document.activeElement).toBe(screen.getByRole("link", { name: "Mot de passe oublié" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("link", { name: "Mot de passe oublié" }),
+    );
 
     screen.getByLabelText("Email").focus();
     await userEvent.keyboard("{Enter}");
@@ -230,19 +279,35 @@ describe("FormulaireInscription", () => {
   it("rend les trois champs, le téléphone étant facultatif", () => {
     render(<FormulaireInscription />);
     expect(screen.getByLabelText("Email")).toHaveProperty("required", true);
-    expect(screen.getByLabelText("Téléphone")).toHaveProperty("required", false);
-    expect(screen.getByLabelText("Mot de passe")).toHaveProperty("required", true);
-    expect(screen.getByText("Au moins 10 caractères, pas un mot de passe courant.")).toBeTruthy();
+    expect(screen.getByLabelText("Téléphone")).toHaveProperty(
+      "required",
+      false,
+    );
+    expect(screen.getByLabelText("Mot de passe")).toHaveProperty(
+      "required",
+      true,
+    );
+    expect(
+      screen.getByText("Au moins 10 caractères, pas un mot de passe courant."),
+    ).toBeTruthy();
   });
 
   it("chemin nominal : poste email + phone + password puis redirige", async () => {
     fetchMock.mockResolvedValue(reponse(201, {}));
     render(<FormulaireInscription />);
 
-    await userEvent.type(screen.getByLabelText("Email"), "nouvelle@example.com");
+    await userEvent.type(
+      screen.getByLabelText("Email"),
+      "nouvelle@example.com",
+    );
     await userEvent.type(screen.getByLabelText("Téléphone"), "0550112233");
-    await userEvent.type(screen.getByLabelText("Mot de passe"), "un-mot-de-passe-long");
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.type(
+      screen.getByLabelText("Mot de passe"),
+      "un-mot-de-passe-long",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/app"));
     expect(appelFetch().corps).toEqual({
@@ -266,17 +331,31 @@ describe("FormulaireInscription", () => {
     // cas ; seule la connexion distingue « compte créé » de « email déjà pris », et elle
     // le fait avec le vocabulaire d'un échec de connexion ordinaire.
     fetchMock
-      .mockResolvedValueOnce(reponse(201, { detail: "Compte créé si l'email était disponible." }))
-      .mockResolvedValueOnce(reponse(401, { detail: "Email ou mot de passe incorrect." }));
+      .mockResolvedValueOnce(
+        reponse(201, { detail: "Compte créé si l'email était disponible." }),
+      )
+      .mockResolvedValueOnce(
+        reponse(401, { detail: "Email ou mot de passe incorrect." }),
+      );
     render(<FormulaireInscription />);
 
-    await userEvent.type(screen.getByLabelText("Email"), "deja-prise@example.com");
-    await userEvent.type(screen.getByLabelText("Mot de passe"), "un-mot-de-passe-long");
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.type(
+      screen.getByLabelText("Email"),
+      "deja-prise@example.com",
+    );
+    await userEvent.type(
+      screen.getByLabelText("Mot de passe"),
+      "un-mot-de-passe-long",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
 
     // Pas une erreur : role="status", pas "alert" — le compte est bien créé.
     const info = await screen.findByRole("status");
-    expect(info.textContent).toContain("Compte créé. Connecte-toi pour continuer.");
+    expect(info.textContent).toContain(
+      "Compte créé. Connecte-toi pour continuer.",
+    );
     expect(info.textContent).not.toMatch(/existe|déjà|pris/i);
     expect(push).not.toHaveBeenCalled();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -286,7 +365,9 @@ describe("FormulaireInscription", () => {
     fetchMock.mockResolvedValue(reponse(201, {}));
     render(<FormulaireInscription />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(appelFetch(0).url).toBe("/api/auth/register");
@@ -295,16 +376,24 @@ describe("FormulaireInscription", () => {
 
   it("400 sur le mot de passe : le message de Django est rattaché au champ", async () => {
     fetchMock.mockResolvedValue(
-      reponse(400, { password: ["Ce mot de passe est trop court.", "Il est trop courant."] }),
+      reponse(400, {
+        password: ["Ce mot de passe est trop court.", "Il est trop courant."],
+      }),
     );
     render(<FormulaireInscription />);
 
     await userEvent.type(screen.getByLabelText("Mot de passe"), "1234");
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
 
     const champ = await screen.findByLabelText("Mot de passe");
-    await waitFor(() => expect(champ.getAttribute("aria-invalid")).toBe("true"));
-    expect(screen.getByText("Ce mot de passe est trop court. Il est trop courant.")).toBeTruthy();
+    await waitFor(() =>
+      expect(champ.getAttribute("aria-invalid")).toBe("true"),
+    );
+    expect(
+      screen.getByText("Ce mot de passe est trop court. Il est trop courant."),
+    ).toBeTruthy();
     expect(push).not.toHaveBeenCalled();
   });
 
@@ -312,36 +401,54 @@ describe("FormulaireInscription", () => {
     fetchMock.mockResolvedValue(reponse(400, { email: ["déjà pris"] }));
     render(<FormulaireInscription />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
     const alerte = await screen.findByRole("alert");
-    expect(alerte.textContent).toBe("Le compte n'a pas pu être créé. Réessaie.");
+    expect(alerte.textContent).toBe(
+      "Le compte n'a pas pu être créé. Réessaie.",
+    );
   });
 
   it("corps non JSON : ne casse pas, message générique", async () => {
-    fetchMock.mockResolvedValue(new Response("<html>500</html>", { status: 500 }));
+    fetchMock.mockResolvedValue(
+      new Response("<html>500</html>", { status: 500 }),
+    );
     render(<FormulaireInscription />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
     const alerte = await screen.findByRole("alert");
-    expect(alerte.textContent).toBe("Le compte n'a pas pu être créé. Réessaie.");
+    expect(alerte.textContent).toBe(
+      "Le compte n'a pas pu être créé. Réessaie.",
+    );
   });
 
   it("429 : message de limitation", async () => {
     fetchMock.mockResolvedValue(reponse(429));
     render(<FormulaireInscription />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
     const alerte = await screen.findByRole("alert");
-    expect(alerte.textContent).toBe("Trop de tentatives. Réessaie dans quelques minutes.");
+    expect(alerte.textContent).toBe(
+      "Trop de tentatives. Réessaie dans quelques minutes.",
+    );
   });
 
   it("réseau coupé : message réseau", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
     render(<FormulaireInscription />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
     const alerte = await screen.findByRole("alert");
-    expect(alerte.textContent).toBe("Impossible de contacter le serveur. Vérifie ta connexion.");
+    expect(alerte.textContent).toBe(
+      "Impossible de contacter le serveur. Vérifie ta connexion.",
+    );
   });
 
   it("état de chargement : « Création du compte… » et bouton désactivé", async () => {
@@ -349,8 +456,12 @@ describe("FormulaireInscription", () => {
     fetchMock.mockReturnValue(promesse);
     render(<FormulaireInscription />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
-    const bouton = await screen.findByRole("button", { name: "Création du compte…" });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
+    const bouton = await screen.findByRole("button", {
+      name: "Création du compte…",
+    });
     expect(bouton).toHaveProperty("disabled", true);
 
     liberer(reponse(201));
@@ -367,7 +478,9 @@ describe("FormulaireInscription", () => {
     await userEvent.tab();
     expect(document.activeElement).toBe(screen.getByLabelText("Mot de passe"));
     await userEvent.tab();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Créer mon compte" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    );
   });
 });
 
@@ -377,9 +490,13 @@ describe("FormulaireMotDePasseOublie", () => {
     render(<FormulaireMotDePasseOublie />);
 
     await userEvent.type(screen.getByLabelText("Email"), "connue@example.com");
-    await userEvent.click(screen.getByRole("button", { name: "Envoyer le lien" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Envoyer le lien" }),
+    );
 
-    expect(await screen.findByText(/Si un compte existe pour cet email/)).toBeTruthy();
+    expect(
+      await screen.findByText(/Si un compte existe pour cet email/),
+    ).toBeTruthy();
     expect(appelFetch().corps).toEqual({ email: "connue@example.com" });
   });
 
@@ -387,8 +504,12 @@ describe("FormulaireMotDePasseOublie", () => {
     fetchMock.mockResolvedValue(reponse(404));
     render(<FormulaireMotDePasseOublie />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Envoyer le lien" }));
-    expect(await screen.findByText(/Si un compte existe pour cet email/)).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Envoyer le lien" }),
+    );
+    expect(
+      await screen.findByText(/Si un compte existe pour cet email/),
+    ).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -401,8 +522,12 @@ describe("FormulaireMotDePasseOublie", () => {
     fetchMock.mockResolvedValue(reponse(500, { detail: "boom" }));
     render(<FormulaireMotDePasseOublie />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Envoyer le lien" }));
-    expect(await screen.findByText(/Si un compte existe pour cet email/)).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Envoyer le lien" }),
+    );
+    expect(
+      await screen.findByText(/Si un compte existe pour cet email/),
+    ).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -411,7 +536,9 @@ describe("FormulaireMotDePasseOublie", () => {
     fetchMock.mockReturnValue(promesse);
     render(<FormulaireMotDePasseOublie />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Envoyer le lien" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Envoyer le lien" }),
+    );
     const bouton = await screen.findByRole("button", { name: "Envoi…" });
     expect(bouton).toHaveProperty("disabled", true);
 
@@ -434,7 +561,9 @@ describe("FormulaireNouveauMotDePasse", () => {
   it("sans token dans l'URL : refuse d'afficher le formulaire", () => {
     render(<FormulaireNouveauMotDePasse />);
 
-    expect(screen.getByRole("alert").textContent).toContain("Ce lien est incomplet");
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Ce lien est incomplet",
+    );
     expect(screen.queryByRole("button")).toBeNull();
   });
 
@@ -443,8 +572,13 @@ describe("FormulaireNouveauMotDePasse", () => {
     fetchMock.mockResolvedValue(reponse(200));
     render(<FormulaireNouveauMotDePasse />);
 
-    await userEvent.type(screen.getByLabelText("Nouveau mot de passe"), "nouveau-mdp-long");
-    await userEvent.click(screen.getByRole("button", { name: "Changer le mot de passe" }));
+    await userEvent.type(
+      screen.getByLabelText("Nouveau mot de passe"),
+      "nouveau-mdp-long",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Changer le mot de passe" }),
+    );
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/connexion"));
     expect(appelFetch().corps).toEqual({
@@ -455,13 +589,23 @@ describe("FormulaireNouveauMotDePasse", () => {
 
   it("400 sur le mot de passe : message rattaché au champ", async () => {
     parametres.set("token", "jeton");
-    fetchMock.mockResolvedValue(reponse(400, { password: ["Ce mot de passe est trop courant."] }));
+    fetchMock.mockResolvedValue(
+      reponse(400, { password: ["Ce mot de passe est trop courant."] }),
+    );
     render(<FormulaireNouveauMotDePasse />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Changer le mot de passe" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Changer le mot de passe" }),
+    );
 
-    expect(await screen.findByText("Ce mot de passe est trop courant.")).toBeTruthy();
-    expect(screen.getByLabelText("Nouveau mot de passe").getAttribute("aria-invalid")).toBe("true");
+    expect(
+      await screen.findByText("Ce mot de passe est trop courant."),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByLabelText("Nouveau mot de passe")
+        .getAttribute("aria-invalid"),
+    ).toBe("true");
   });
 
   it("token périmé ou déjà consommé : message qui dit quoi faire", async () => {
@@ -469,9 +613,13 @@ describe("FormulaireNouveauMotDePasse", () => {
     fetchMock.mockResolvedValue(reponse(400, { detail: "invalide" }));
     render(<FormulaireNouveauMotDePasse />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Changer le mot de passe" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Changer le mot de passe" }),
+    );
     expect(
-      await screen.findByText("Ce lien n'est plus valable. Demande-en un nouveau."),
+      await screen.findByText(
+        "Ce lien n'est plus valable. Demande-en un nouveau.",
+      ),
     ).toBeTruthy();
   });
 
@@ -480,9 +628,13 @@ describe("FormulaireNouveauMotDePasse", () => {
     fetchMock.mockResolvedValue(reponse(429));
     render(<FormulaireNouveauMotDePasse />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Changer le mot de passe" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Changer le mot de passe" }),
+    );
     expect(
-      await screen.findByText("Trop de tentatives. Réessaie dans quelques minutes."),
+      await screen.findByText(
+        "Trop de tentatives. Réessaie dans quelques minutes.",
+      ),
     ).toBeTruthy();
   });
 
@@ -491,9 +643,13 @@ describe("FormulaireNouveauMotDePasse", () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
     render(<FormulaireNouveauMotDePasse />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Changer le mot de passe" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Changer le mot de passe" }),
+    );
     expect(
-      await screen.findByText("Impossible de contacter le serveur. Vérifie ta connexion."),
+      await screen.findByText(
+        "Impossible de contacter le serveur. Vérifie ta connexion.",
+      ),
     ).toBeTruthy();
   });
 
@@ -503,8 +659,12 @@ describe("FormulaireNouveauMotDePasse", () => {
     fetchMock.mockReturnValue(promesse);
     render(<FormulaireNouveauMotDePasse />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Changer le mot de passe" }));
-    const bouton = await screen.findByRole("button", { name: "Enregistrement…" });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Changer le mot de passe" }),
+    );
+    const bouton = await screen.findByRole("button", {
+      name: "Enregistrement…",
+    });
     expect(bouton).toHaveProperty("disabled", true);
 
     liberer(reponse(200));
@@ -516,7 +676,9 @@ describe("FormulaireNouveauMotDePasse", () => {
     render(<FormulaireNouveauMotDePasse />);
 
     await userEvent.tab();
-    expect(document.activeElement).toBe(screen.getByLabelText("Nouveau mot de passe"));
+    expect(document.activeElement).toBe(
+      screen.getByLabelText("Nouveau mot de passe"),
+    );
     await userEvent.tab();
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "Changer le mot de passe" }),
@@ -529,10 +691,14 @@ describe("BoutonDeconnexion", () => {
     fetchMock.mockResolvedValue(reponse(204));
     render(<BoutonDeconnexion />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Se déconnecter" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Se déconnecter" }),
+    );
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/connexion"));
-    expect(fetchMock).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/logout", {
+      method: "POST",
+    });
     expect(refresh).toHaveBeenCalled();
   });
 
@@ -552,7 +718,9 @@ describe("BoutonDeconnexion", () => {
     fetchMock.mockReturnValue(promesse);
     render(<BoutonDeconnexion />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Se déconnecter" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Se déconnecter" }),
+    );
     const bouton = await screen.findByRole("button", { name: "Déconnexion…" });
     expect(bouton).toHaveProperty("disabled", true);
 
@@ -565,7 +733,9 @@ describe("BoutonDeconnexion", () => {
     render(<BoutonDeconnexion />);
 
     await userEvent.tab();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Se déconnecter" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Se déconnecter" }),
+    );
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });

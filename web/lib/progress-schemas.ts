@@ -26,6 +26,7 @@ export const moduleEtatSchema = z.object({
   completed_chapters: z.number(),
   total_chapters: z.number(),
   chapters: z.array(chapitreEtatSchema),
+  recommande_apres_ordre: z.number().nullable(),
 });
 
 export const pipelineSchema = z.object({

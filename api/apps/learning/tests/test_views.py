@@ -22,6 +22,27 @@ def test_progress_404_sur_un_cours_inconnu(
     assert response.status_code == 404
 
 
+def test_progress_404_sur_un_parametre_course_malforme(
+    client_etudiante: APIClient, inscription_active: Enrollment
+) -> None:
+    """Un octet NUL ou tout caractère hors de l'alphabet d'un slug ne doit jamais
+    atteindre la base — sinon le pilote PostgreSQL lève une exception non gérée (500)
+    plutôt qu'un 404 propre (§8 relecture étape 5, MOYEN M2)."""
+    for valeur in ("\x00", "' OR 1=1--", "../../etc/passwd", "flutter%", ""):
+        response = client_etudiante.get("/api/progress", {"course": valeur})
+        assert response.status_code == 404, f"valeur {valeur!r}"
+
+
+def test_progress_est_limite_en_debit(
+    client_etudiante: APIClient, inscription_active: Enrollment, cours: Course
+) -> None:
+    cache.clear()
+    for _ in range(60):
+        client_etudiante.get("/api/progress", {"course": cours.slug})
+    response = client_etudiante.get("/api/progress", {"course": cours.slug})
+    assert response.status_code == 429
+
+
 def test_progress_renvoie_la_structure_du_pipeline(
     client_etudiante: APIClient,
     inscription_active: Enrollment,

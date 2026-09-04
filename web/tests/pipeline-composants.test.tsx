@@ -34,6 +34,7 @@ const PIPELINE = {
       unlocked: true,
       completed_chapters: 1,
       total_chapters: 2,
+      recommande_apres_ordre: null,
       chapters: [
         {
           id: 1,
@@ -60,6 +61,7 @@ const PIPELINE = {
       unlocked: false,
       completed_chapters: 0,
       total_chapters: 1,
+      recommande_apres_ordre: 0,
       chapters: [
         {
           id: 3,
@@ -119,7 +121,17 @@ describe("Pipeline", () => {
     const lien = screen.getByRole("link", { name: /Premier écran/ });
     expect(lien.tagName).toBe("A");
     expect(lien.getAttribute("href")).toBe("/app/chapitre/premier-ecran");
-    expect(lien.getAttribute("title")).toContain("Termine d'abord le module");
+  });
+
+  it("désigne le bon module dans la recommandation, visible sans survol ni title", () => {
+    render(<Pipeline pipeline={PIPELINE} />);
+
+    // Le module verrouillé est le module 1 ; celui qui le déverrouillerait est le
+    // module 0 (`recommande_apres_ordre`) — jamais le module qu'on est en train
+    // d'ouvrir. Rendu en texte permanent, pas dans un attribut `title` (invisible au
+    // clavier et au tactile).
+    const recommandation = screen.getByText("Termine d'abord le module 0.");
+    expect(recommandation.tagName).toBe("P");
   });
 
   it("annonce l'état de chaque chapitre pour un lecteur d'écran", () => {

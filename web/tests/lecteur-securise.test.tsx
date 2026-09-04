@@ -355,6 +355,10 @@ describe("LecteurSecurise", () => {
 
     render(createElement(LecteurSecurise, { lessonId: 7, titre: "T" }));
     await waitFor(() => expect(document.querySelector("video")).not.toBeNull());
+    /* Le minuteur de renouvellement est armé dans un effet, qui peut passer après le
+       rendu de la vidéo : on attend qu'il soit réellement capturé, sinon l'appel plus
+       bas est un coup dans le vide et le test échoue au hasard (machine chargée). */
+    await waitFor(() => expect(captures.length).toBeGreaterThan(0));
     const avant = vi.mocked(fetch).mock.calls.length;
 
     await act(async () => {
