@@ -247,13 +247,19 @@ En navigation privée, arriver sur `/`, lire le chapitre gratuit en entier, lais
 Compte A téléverse un reçu → l'admin le voit dans sa file → refuse avec motif → A reçoit l'email et peut renvoyer → l'admin accepte → A recharge et son parcours est ouvert. Vérifier ensuite qu'un `AuditLog` existe pour chacune des trois actions admin.
 
 **Terminé quand**
-- [ ] Un `.svg`, un `.php` renommé en `.jpg` et un fichier de 100 Mo sont tous rejetés
-- [ ] Le fichier stocké n'est atteignable par aucune URL publique
-- [ ] L'étudiant A ne peut pas récupérer la preuve de l'étudiant B (404)
-- [ ] Un compte `PENDING` n'accède à aucun chapitre non gratuit
-- [ ] L'EXIF est absent des images stockées
+- [x] Un `.svg`, un `.php` renommé en `.jpg` et un fichier de 100 Mo sont tous rejetés — *2026-09-04*
+- [x] Le fichier stocké n'est atteignable par aucune URL publique — *2026-09-04*
+- [x] L'étudiant A ne peut pas récupérer la preuve de l'étudiant B (404) — *2026-09-04*
+- [x] Un compte `PENDING` n'accède à aucun chapitre non gratuit — *2026-09-04*
+- [x] L'EXIF est absent des images stockées — *2026-09-04*
 
-**Porte** — [ ] code-reviewer · [ ] code-tester · [ ] security-tester *(points 1, 4 et 7 — c'est l'étape la plus exposée du projet)*
+**Porte** — [x] code-reviewer · [x] code-tester · [x] security-tester — *2026-09-04*
+
+> Porte fermée au premier passage : **1 BLOQUANT** (ruff/mypy sur les tests), **2 ÉLEVÉ**
+> (signature de preuve dans les access logs Django ; jeton de reset imprimé sur stdout).
+> Tout a été corrigé et revérifié ; `docs/reviews/etape-03-suites.md` dit ce qui a été
+> fait de chaque constatation, ce qui a été assumé, et pourquoi.
+> **Il ne reste aucun BLOQUANT ni CRITIQUE/ÉLEVÉ.** 434 tests backend, 404 tests frontend.
 
 ---
 

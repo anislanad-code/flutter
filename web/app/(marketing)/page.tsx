@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { EnTeteMarketing } from "@/components/marketing/EnTeteMarketing";
 import { Faq } from "@/components/marketing/Faq";
-import { LecteurChapitreGratuit } from "@/components/marketing/LecteurChapitreGratuit";
+import { LecteurChapitre } from "@/components/course/LecteurChapitre";
 import { Parcours } from "@/components/marketing/Parcours";
 import { Tarifs } from "@/components/marketing/Tarifs";
 import {
@@ -83,7 +83,7 @@ export default async function Landing() {
 
           <div className="mt-10">
             {chapitreGratuit ? (
-              <LecteurChapitreGratuit chapitre={chapitreGratuit} />
+              <LecteurChapitre chapitre={chapitreGratuit} />
             ) : (
               <p className="text-[length:var(--texte-base)] text-ink">
                 Le chapitre gratuit est momentanément indisponible.

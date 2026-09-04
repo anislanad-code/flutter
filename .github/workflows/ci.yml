@@ -79,6 +79,11 @@ jobs:
           DJANGO_ADMIN_PATH: chemin-de-ci
           EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
           DEFAULT_FROM_EMAIL: contact@anis.dev
+          PAYMENT_PROOF_ENCRYPTION_KEY: cle-de-ci-preuves-assez-longue-pour-passer
+          PAYMENT_PROOF_STORAGE_DIR: /tmp/preuves-ci
+          COURSE_PRICE_DZD: "12000"
+          CCP_ACCOUNT_NUMBER: "0012345678"
+          CCP_ACCOUNT_HOLDER: LANAD ANIS
         run: python manage.py check --deploy --fail-level WARNING
 
   web:

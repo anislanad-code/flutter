@@ -4,9 +4,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# libpq pour psycopg, build-essential pour argon2-cffi
+# libpq pour psycopg, build-essential pour argon2-cffi,
+# libmagic1 pour python-magic (détection du type réel par magic bytes, §4.5)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev curl \
+    && apt-get install -y --no-install-recommends \
+        build-essential libpq-dev curl libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -27,3 +27,26 @@ if not DJANGO_ADMIN_PATH or DJANGO_ADMIN_PATH == "admin":
 
 EMAIL_BACKEND = env.str("EMAIL_BACKEND")
 DEFAULT_FROM_EMAIL = env.str("DEFAULT_FROM_EMAIL")
+
+# --- Preuves de paiement (§4.5) --------------------------------------------
+# Un secret de chiffrement absent ou court signifie des numéros de CCP en clair sur le
+# disque : on refuse de démarrer plutôt que de le découvrir après coup.
+PAYMENT_PROOF_ENCRYPTION_KEY = env.str("PAYMENT_PROOF_ENCRYPTION_KEY")
+CLE_EXEMPLE = "remplace-moi-par-48-octets-aleatoires-en-base64url"
+if len(PAYMENT_PROOF_ENCRYPTION_KEY) < 32 or PAYMENT_PROOF_ENCRYPTION_KEY == CLE_EXEMPLE:
+    raise ImproperlyConfigured(
+        "PAYMENT_PROOF_ENCRYPTION_KEY doit être aléatoire, distincte de l'exemple, "
+        "et contenir au moins 32 caractères."
+    )
+
+# Le stockage doit être désigné explicitement en production : le défaut de `base.py`
+# vit à l'intérieur du code de l'application, ce qui ne survit pas à un redéploiement.
+PAYMENT_PROOF_STORAGE_DIR = env.str("PAYMENT_PROOF_STORAGE_DIR")
+
+COURSE_PRICE_DZD = env.int("COURSE_PRICE_DZD")
+if COURSE_PRICE_DZD <= 0:
+    raise ImproperlyConfigured("COURSE_PRICE_DZD doit être un montant réel en production.")
+if not env.str("CCP_ACCOUNT_NUMBER") or not env.str("CCP_ACCOUNT_HOLDER"):
+    raise ImproperlyConfigured(
+        "Les coordonnées de versement doivent être renseignées en production."
+    )

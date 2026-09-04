@@ -235,6 +235,33 @@ describe("apiFetch — délai maximum", () => {
     expect(resultat.ok).toBe(true);
     expect(signalRecu?.aborted).toBe(false);
   });
+
+  it("honore un timeoutMs plus long que le défaut (upload de preuve)", async () => {
+    vi.useFakeTimers();
+
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }),
+    );
+    const { apiFetch } = await chargerApi();
+
+    const enCours = apiFetch("/api/enrollment/proof", { method: "POST" }, { timeoutMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(8_001);
+    expect(fetchMock).toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(51_998);
+    await vi.advanceTimersByTimeAsync(2);
+
+    await expect(enCours).resolves.toEqual({
+      ok: false,
+      status: 503,
+      error: "api_unreachable",
+    });
+  });
 });
 
 describe("apiFetch — non-divulgation de l'URL interne (§4.6)", () => {
@@ -260,5 +287,116 @@ describe("apiFetch — non-divulgation de l'URL interne (§4.6)", () => {
     const { apiFetch } = await chargerApi();
 
     expect(JSON.stringify(await apiFetch("/api/x"))).not.toContain("api:8000");
+  });
+});
+
+describe("apiFetch — corps multipart", () => {
+  it("laisse FormData poser son Content-Type, frontière comprise", async () => {
+    fetchMock.mockResolvedValue(reponse({ ok: true }));
+    const { apiFetch } = await chargerApi();
+
+    const corps = new FormData();
+    corps.append("amount_declared", "12000");
+    await apiFetch("/api/enrollment/proof", { method: "POST", body: corps });
+
+    const entetes = fetchMock.mock.calls[0]?.[1].headers as Headers;
+    expect(entetes.has("Content-Type")).toBe(false);
+  });
+
+  it("continue de poser application/json sur un corps JSON", async () => {
+    fetchMock.mockResolvedValue(reponse({ ok: true }));
+    const { apiFetch } = await chargerApi();
+
+    await apiFetch("/api/auth/login", { method: "POST", body: JSON.stringify({ a: 1 }) });
+
+    const entetes = fetchMock.mock.calls[0]?.[1].headers as Headers;
+    expect(entetes.get("Content-Type")).toBe("application/json");
+  });
+});
+
+/* `apiFetchBinaire` ne sert aujourd'hui qu'à une chose : rapatrier une preuve de
+   paiement déchiffrée par Django pour l'admin. Elle ne doit jamais mettre ce contenu
+   en cache, ni relayer une erreur qui décrit l'amont (§4.5, §4.6). */
+describe("apiFetchBinaire", () => {
+  function reponseBinaire(
+    octets: Uint8Array,
+    init: { status?: number; contentType?: string | null } = {},
+  ) {
+    const status = init.status ?? 200;
+    const contentType = init.contentType === undefined ? "image/jpeg" : init.contentType;
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: new Headers(contentType ? { "content-type": contentType } : {}),
+      arrayBuffer: async () => octets.buffer,
+    } as unknown as Response;
+  }
+
+  it("rend le contenu et son type quand Django répond 200", async () => {
+    fetchMock.mockResolvedValue(reponseBinaire(new Uint8Array([0xff, 0xd8, 0xff])));
+    const { apiFetchBinaire } = await chargerApi();
+
+    const resultat = await apiFetchBinaire("/api/admin/proofs/x/file");
+
+    expect(resultat.ok).toBe(true);
+    if (!resultat.ok) return;
+    expect(new Uint8Array(resultat.contenu)).toEqual(new Uint8Array([0xff, 0xd8, 0xff]));
+    expect(resultat.contentType).toBe("image/jpeg");
+  });
+
+  it("ne met jamais une preuve en cache", async () => {
+    fetchMock.mockResolvedValue(reponseBinaire(new Uint8Array([1])));
+    const { apiFetchBinaire } = await chargerApi();
+
+    await apiFetchBinaire("/api/admin/proofs/x/file");
+
+    expect(fetchMock.mock.calls[0]?.[1].cache).toBe("no-store");
+  });
+
+  it("retombe sur octet-stream si l'amont ne déclare pas de type", async () => {
+    fetchMock.mockResolvedValue(reponseBinaire(new Uint8Array([1]), { contentType: null }));
+    const { apiFetchBinaire } = await chargerApi();
+
+    const resultat = await apiFetchBinaire("/api/admin/proofs/x/file");
+
+    expect(resultat.ok && resultat.contentType).toBe("application/octet-stream");
+  });
+
+  it("relaie le statut d'échec sans le corps de l'amont", async () => {
+    fetchMock.mockResolvedValue(reponseBinaire(new Uint8Array([1]), { status: 403 }));
+    const { apiFetchBinaire } = await chargerApi();
+
+    expect(await apiFetchBinaire("/api/admin/proofs/x/file")).toEqual({ ok: false, status: 403 });
+  });
+
+  it("Django injoignable : 503 sans trace de l'hôte interne", async () => {
+    fetchMock.mockRejectedValue(new TypeError(`connect ECONNREFUSED ${URL_INTERNE}`));
+    const { apiFetchBinaire } = await chargerApi();
+
+    const resultat = await apiFetchBinaire("/api/admin/proofs/x/file");
+
+    expect(resultat).toEqual({ ok: false, status: 503 });
+    expect(JSON.stringify(resultat)).not.toContain("api:8000");
+  });
+
+  it("abandonne la requête au-delà du délai plutôt que de bloquer la page admin", async () => {
+    vi.useFakeTimers();
+    let signalRecu: AbortSignal | undefined;
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          signalRecu = init.signal ?? undefined;
+          signalRecu?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        }),
+    );
+    const { apiFetchBinaire } = await chargerApi();
+
+    const promesse = apiFetchBinaire("/api/admin/proofs/x/file");
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(await promesse).toEqual({ ok: false, status: 503 });
+    expect(signalRecu?.aborted).toBe(true);
   });
 });

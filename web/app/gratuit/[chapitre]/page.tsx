@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { FormulaireListeAttente } from "@/components/marketing/FormulaireListeAttente";
-import { LecteurChapitreGratuit } from "@/components/marketing/LecteurChapitreGratuit";
+import { LecteurChapitre } from "@/components/course/LecteurChapitre";
 import { recupererChapitreGratuit } from "@/lib/catalog";
 
 type Props = {
@@ -53,7 +53,7 @@ export default async function ChapitreGratuitPage({ params }: Props) {
       </p>
 
       <div className="mt-10">
-        <LecteurChapitreGratuit chapitre={chapitre} />
+        <LecteurChapitre chapitre={chapitre} />
       </div>
 
       <div className="mt-16 rounded-lg border border-ink p-6">

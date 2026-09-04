@@ -15,6 +15,10 @@ dependencies = [
     "argon2-cffi==23.1.0",
     "django-environ==0.11.2",
     "gunicorn==23.0.0",
+    # Preuves de paiement (§4.5) : type réel par magic bytes, réencodage, chiffrement.
+    "python-magic==0.4.27",
+    "pillow==12.3.0",
+    "cryptography==50.0.1",
 ]
 
 [project.optional-dependencies]
@@ -71,6 +75,13 @@ ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = ["environ.*"]
+ignore_missing_imports = true
+
+# python-magic n'expose pas d'annotations et n'a pas de paquet de stubs publié.
+# La seule fonction utilisée (`from_buffer`) est réannotée à l'usage dans
+# apps/enrollment/files.py.
+[[tool.mypy.overrides]]
+module = ["magic.*"]
 ignore_missing_imports = true
 
 [tool.django-stubs]

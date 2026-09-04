@@ -1,12 +1,17 @@
 import { LecteurVideo } from "@/components/marketing/LecteurVideo";
-import type { ChapitreGratuit } from "@/lib/catalog-schemas";
+import type { Chapitre } from "@/lib/catalog-schemas";
 import { analyserTranscript } from "@/lib/markdown-leger";
 
+/* Rendu d'un chapitre, gratuit ou payant. Le composant ne décide **jamais** du droit
+   d'y accéder : il affiche ce que le serveur a bien voulu lui donner. La règle du
+   paywall vit dans Django (§4.4), et un chapitre payant n'arrive jusqu'ici que si
+   l'API l'a déjà servi à un compte `ACTIVE`. */
+
 type Props = {
-  chapitre: ChapitreGratuit;
+  chapitre: Chapitre;
 };
 
-export function LecteurChapitreGratuit({ chapitre }: Props) {
+export function LecteurChapitre({ chapitre }: Props) {
   const blocs = analyserTranscript(chapitre.lesson.transcript);
 
   return (

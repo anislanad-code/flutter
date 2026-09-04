@@ -147,6 +147,7 @@ describe("middleware — portée", () => {
     expect(source).toContain("_next/static");
     expect(source).toContain("_next/image");
     expect(source).toContain("favicon.ico");
+    expect(source).toContain("api/admin/proofs/");
   });
 
   it("ne conditionne sa portée à aucun en-tête de requête", () => {

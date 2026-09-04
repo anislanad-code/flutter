@@ -51,6 +51,14 @@ def test_les_reglages_de_production_sont_durcis(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("DJANGO_ADMIN_PATH", "chemin-secret")
     monkeypatch.setenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
     monkeypatch.setenv("DEFAULT_FROM_EMAIL", "contact@anis.dev")
+    monkeypatch.setenv(
+        "PAYMENT_PROOF_ENCRYPTION_KEY",
+        "cle-de-prod-suffisamment-longue-pour-passer-le-garde",
+    )
+    monkeypatch.setenv("PAYMENT_PROOF_STORAGE_DIR", "/var/preuves-privees")
+    monkeypatch.setenv("COURSE_PRICE_DZD", "12000")
+    monkeypatch.setenv("CCP_ACCOUNT_NUMBER", "0012345678")
+    monkeypatch.setenv("CCP_ACCOUNT_HOLDER", "LANAD ANIS")
     prod = importlib.reload(importlib.import_module("config.settings.prod"))
 
     assert prod.DEBUG is False

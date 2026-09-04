@@ -56,6 +56,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.enrollment.middleware.PlafondPreuveMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -138,6 +139,32 @@ PASSWORD_RESET_TOKEN_TTL_SECONDS = 30 * 60
 # URL publique du site Next, utilisée pour construire les liens envoyés par email.
 SITE_URL: str = env.str("SITE_URL", default="http://localhost:3000")
 
+# --- Preuves de paiement (CLAUDE.md §4.5) ----------------------------------
+# Répertoire privé, hors racine web : aucune route statique de Django ni de Next ne
+# pointe dessus. Le seul chemin de lecture est /api/admin/proofs/{id}/file, qui exige
+# une session admin *et* une signature de 10 minutes.
+PAYMENT_PROOF_STORAGE_DIR: str = env.str(
+    "PAYMENT_PROOF_STORAGE_DIR", default=str(BASE_DIR / ".preuves-privees")
+)
+# Secret de chiffrement au repos. Aucune valeur par défaut utilisable : `storage.py`
+# refuse un secret de moins de 32 caractères plutôt que de chiffrer avec de la paille.
+PAYMENT_PROOF_ENCRYPTION_KEY: str = env.str("PAYMENT_PROOF_ENCRYPTION_KEY", default="")
+
+# Taille maximale d'un corps non-fichier, et seuil au-delà duquel un fichier téléversé
+# passe sur disque au lieu de rester en mémoire. La limite de 5 Mo du §4.5, elle, est
+# appliquée dans apps/enrollment/files.py — ceci ne fait que borner le coût du refus.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 100
+
+# --- Versement CCP (CLAUDE.md §2 : manuel d'abord, Chargily à l'étape 11) ---
+# Coordonnées destinées à être affichées : ce ne sont pas des secrets, mais ce sont
+# des données de déploiement — jamais en dur dans le code.
+COURSE_PRICE_DZD: int = env.int("COURSE_PRICE_DZD", default=0)
+CCP_ACCOUNT_NUMBER: str = env.str("CCP_ACCOUNT_NUMBER", default="")
+CCP_ACCOUNT_KEY: str = env.str("CCP_ACCOUNT_KEY", default="")
+CCP_ACCOUNT_HOLDER: str = env.str("CCP_ACCOUNT_HOLDER", default="")
+
 # --- Cache : compteurs de limitation de débit (§4.2) ------------------------
 # Backend mémoire locale par défaut : correct en dev/tests/mono-worker. Voir la limite
 # documentée dans apps/accounts/throttling.py pour un déploiement multi-worker.
@@ -179,11 +206,27 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "redact_secrets": {"()": "config.logging_filters.RedactSecretsFilter"},
+    },
     "formatters": {
         "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "filters": ["redact_secrets"],
+        },
+    },
+    "loggers": {
+        # `runserver` / gunicorn écrivent la ligne de requête ici : c'est par ce
+        # canal qu'une signature en query string fuirait (§4.6).
+        "django.server": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
     "root": {"handlers": ["console"], "level": "INFO"},
 }

@@ -29,6 +29,8 @@ coverage/
 # avalait aussi api/apps/media/, l'application du §3, qui a disparu du dépôt sans bruit.
 /api/media/
 /api/staticfiles/
+# Preuves de paiement : documents personnels chiffrés (§4.5). Jamais dans le dépôt.
+/api/.preuves-privees/
 
 # Captures et traces d'outils de vérification, déposées à la racine
 .playwright-mcp/

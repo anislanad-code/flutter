@@ -8,8 +8,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "dev": "next dev --turbopack",
-    "test": "vitest run",
-    "test:cov": "vitest run --coverage"
+    "test": "NODE_ENV=test vitest run",
+    "test:cov": "NODE_ENV=test vitest run --coverage"
   },
   "dependencies": {
     "next": "^15.5.25",

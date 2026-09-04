@@ -65,5 +65,5 @@ export const config = {
   // Aucune condition `missing` : elles portaient sur `next-router-prefetch` et
   // `purpose: prefetch`, deux en-têtes de requête ordinaires qu'un client pose lui-même.
   // `curl -H "purpose: prefetch" /` renvoyait alors le document entier sans CSP.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/admin/proofs/).*)"],
 };

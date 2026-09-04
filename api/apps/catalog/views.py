@@ -8,21 +8,23 @@ from __future__ import annotations
 
 from django.http import Http404
 from rest_framework.authentication import BaseAuthentication
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.models import User
 from apps.accounts.throttling import TropDeTentativesError, enforce_rate_limit
 from apps.accounts.utils import get_client_ip
 from apps.accounts.utils import ip_prefix as compute_ip_prefix
 from apps.catalog import services
 from apps.catalog.models import Chapter, Course
 from apps.catalog.serializers import (
-    ChapterFreeDetailSerializer,
+    ChapterDetailSerializer,
     CoursePublicSerializer,
     LeadSerializer,
 )
+from apps.enrollment import services as enrollment_services
 
 
 class CoursePublicDetailView(APIView):
@@ -62,7 +64,39 @@ class ChapterPublicDetailView(APIView):
             # Même réponse — sans argument, donc bit pour bit identique — qu'un
             # chapitre inexistant : ne jamais confirmer qu'il existe (§4.3).
             raise Http404
-        return Response(ChapterFreeDetailSerializer(chapter).data)
+        return Response(ChapterDetailSerializer(chapter).data)
+
+
+class ChapterDetailView(APIView):
+    """Contenu d'un chapitre pour un compte connecté.
+
+    C'est le seul endroit où un chapitre payant peut sortir de l'API, et il ne le fait
+    que pour une inscription `ACTIVE` (§4.4). Un compte `PENDING`, `BLOCKED` ou
+    `EXPIRED` reçoit exactement la même 404 qu'un chapitre inexistant : ni le titre, ni
+    la durée, ni l'existence du chapitre ne fuient par cette route.
+
+    Un chapitre à la fois, jamais l'arbre complet avec les contenus (§4.4).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, slug: str) -> Response:
+        assert isinstance(request.user, User)
+
+        try:
+            chapter = Chapter.objects.select_related("lesson", "module", "module__course").get(
+                slug=slug
+            )
+        except Chapter.DoesNotExist:
+            raise Http404 from None
+
+        if not chapter.module.course.is_published:
+            raise Http404
+
+        if not chapter.is_free and not enrollment_services.a_acces_au_contenu(request.user):
+            raise Http404
+
+        return Response(ChapterDetailSerializer(chapter).data)
 
 
 class LeadCreateView(APIView):

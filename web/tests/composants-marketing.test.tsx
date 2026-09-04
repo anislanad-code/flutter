@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { Faq } from "@/components/marketing/Faq";
-import { LecteurChapitreGratuit } from "@/components/marketing/LecteurChapitreGratuit";
+import { LecteurChapitre } from "@/components/course/LecteurChapitre";
 import { LecteurVideo } from "@/components/marketing/LecteurVideo";
 import { Parcours } from "@/components/marketing/Parcours";
 import { Tarifs } from "@/components/marketing/Tarifs";
@@ -70,9 +70,9 @@ describe("LecteurVideo", () => {
   });
 });
 
-describe("LecteurChapitreGratuit", () => {
+describe("LecteurChapitre", () => {
   it("rend le transcript en titres, paragraphes et code, et les ressources", () => {
-    const html = renderToStaticMarkup(createElement(LecteurChapitreGratuit, { chapitre: CHAPITRE }));
+    const html = renderToStaticMarkup(createElement(LecteurChapitre, { chapitre: CHAPITRE }));
 
     expect(html).toContain("Un titre");
     expect(html).toContain("Un paragraphe.");
@@ -83,7 +83,7 @@ describe("LecteurChapitreGratuit", () => {
   it("n'affiche pas de section ressources quand il n'y en a aucune", () => {
     const sansRessources = { ...CHAPITRE, lesson: { ...CHAPITRE.lesson, resources: [] } };
     const html = renderToStaticMarkup(
-      createElement(LecteurChapitreGratuit, { chapitre: sansRessources }),
+      createElement(LecteurChapitre, { chapitre: sansRessources }),
     );
 
     expect(html).not.toContain("Ressources");

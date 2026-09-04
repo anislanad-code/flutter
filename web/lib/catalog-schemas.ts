@@ -37,18 +37,26 @@ export const leconSchema = z.object({
   resources: z.array(ressourceSchema),
 });
 
-export const chapitreGratuitSchema = z.object({
+export const chapitreSchema = z.object({
   id: z.number(),
   slug: z.string(),
   title: z.string(),
-  is_free: z.literal(true),
+  is_free: z.boolean(),
   lesson: leconSchema,
   module_title: z.string(),
   course_slug: z.string(),
   course_title: z.string(),
 });
 
+/* La route publique ne sert **que** des chapitres gratuits : `is_free` y est un
+   littéral, pas un booléen. Si Django renvoyait un jour un chapitre payant par cette
+   route, le parsing échouerait ici plutôt que de l'afficher (§7). */
+export const chapitreGratuitSchema = chapitreSchema.extend({
+  is_free: z.literal(true),
+});
+
 export type ChapitreResume = z.infer<typeof chapitreResumeSchema>;
 export type ModuleResume = z.infer<typeof moduleResumeSchema>;
 export type CoursPublic = z.infer<typeof coursPublicSchema>;
+export type Chapitre = z.infer<typeof chapitreSchema>;
 export type ChapitreGratuit = z.infer<typeof chapitreGratuitSchema>;

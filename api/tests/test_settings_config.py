@@ -20,6 +20,11 @@ ENV_PROD_VALIDE = {
     "DJANGO_ADMIN_PATH": "ops-3f9a2b",
     "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
     "DEFAULT_FROM_EMAIL": "contact@anis.dev",
+    "PAYMENT_PROOF_ENCRYPTION_KEY": "cle-de-prod-suffisamment-longue-pour-passer-le-garde",
+    "PAYMENT_PROOF_STORAGE_DIR": "/var/preuves-privees",
+    "COURSE_PRICE_DZD": "12000",
+    "CCP_ACCOUNT_NUMBER": "0012345678",
+    "CCP_ACCOUNT_HOLDER": "LANAD ANIS",
 }
 
 
@@ -98,6 +103,8 @@ def test_la_journalisation_n_active_pas_le_journal_sql() -> None:
 
     assert "django.db.backends" not in journaux
     assert settings.LOGGING["root"]["level"] != "DEBUG"
+    assert "redact_secrets" in settings.LOGGING["handlers"]["console"]["filters"]
+    assert settings.LOGGING["loggers"]["django.server"]["propagate"] is False
 
 
 def test_une_cle_secrete_absente_empeche_le_demarrage() -> None:
@@ -219,3 +226,46 @@ def test_la_production_herite_des_invariantes_du_socle(monkeypatch: pytest.Monke
     assert prod.CSRF_COOKIE_HTTPONLY is True
     assert prod.PASSWORD_HASHERS[0].endswith("Argon2PasswordHasher")
     assert prod.X_FRAME_OPTIONS == "DENY"
+
+
+def test_la_production_refuse_une_cle_de_chiffrement_courte(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un secret court = des numéros de CCP en clair sur le disque. On refuse de démarrer."""
+    with pytest.raises(ImproperlyConfigured, match="PAYMENT_PROOF_ENCRYPTION_KEY"):
+        _charger_prod(monkeypatch, PAYMENT_PROOF_ENCRYPTION_KEY="trop-court")
+
+
+def test_la_production_refuse_une_cle_de_chiffrement_vide(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ImproperlyConfigured, match="PAYMENT_PROOF_ENCRYPTION_KEY"):
+        _charger_prod(monkeypatch, PAYMENT_PROOF_ENCRYPTION_KEY="")
+
+
+def test_la_production_exige_un_repertoire_de_preuves(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ImproperlyConfigured, match="PAYMENT_PROOF_STORAGE_DIR"):
+        _charger_prod(monkeypatch, PAYMENT_PROOF_STORAGE_DIR=None)
+
+
+def test_la_production_refuse_la_cle_de_chiffrement_d_exemple(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La valeur de `.env.example` a 48 caractères : un seuil de longueur ne suffit pas."""
+    with pytest.raises(ImproperlyConfigured, match="PAYMENT_PROOF_ENCRYPTION_KEY"):
+        _charger_prod(
+            monkeypatch,
+            PAYMENT_PROOF_ENCRYPTION_KEY="remplace-moi-par-48-octets-aleatoires-en-base64url",
+        )
+
+
+def test_la_production_refuse_un_prix_nul(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ImproperlyConfigured, match="COURSE_PRICE_DZD"):
+        _charger_prod(monkeypatch, COURSE_PRICE_DZD="0")
+
+
+def test_la_production_exige_les_coordonnees_de_versement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ImproperlyConfigured, match="coordonnées de versement"):
+        _charger_prod(monkeypatch, CCP_ACCOUNT_NUMBER="", CCP_ACCOUNT_HOLDER="")

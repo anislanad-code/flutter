@@ -40,8 +40,25 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     command: >
-      sh -c "python manage.py migrate --noinput &&
+      sh -c "mkdir -p /app/.preuves-privees &&
+             python manage.py migrate --noinput &&
              python manage.py runserver 0.0.0.0:8000"
+
+  # Purge des preuves 90 jours après examen (§4.5). Une boucle quotidienne suffit
+  # en développement ; Celery beat arrivera à l'étape 10 pour la prod multi-worker.
+  purge:
+    build: ./api
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    volumes:
+      - ./api:/app
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "while true; do python manage.py purger_preuves; sleep 86400; done"
 
   web:
     build: ./web

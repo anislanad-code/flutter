@@ -9,4 +9,4 @@ DEBUG = env.bool("DJANGO_DEBUG", default=True)
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
-EMAIL_BACKEND = env.str("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_BACKEND = env.str("EMAIL_BACKEND", default="config.mail.RedactingConsoleEmailBackend")

@@ -45,8 +45,12 @@ class LessonSerializer(serializers.ModelSerializer[Lesson]):
         read_only_fields = fields
 
 
-class ChapterFreeDetailSerializer(serializers.ModelSerializer[Chapter]):
-    """Renvoyé uniquement quand `is_free` est vrai (vérifié en vue, pas ici)."""
+class ChapterDetailSerializer(serializers.ModelSerializer[Chapter]):
+    """Contenu complet d'un chapitre, leçon comprise.
+
+    Le droit d'y accéder est vérifié **en vue**, jamais ici : route publique → `is_free`
+    obligatoire ; route authentifiée → `is_free` ou inscription `ACTIVE` (§4.4).
+    """
 
     lesson = LessonSerializer(read_only=True)
     module_title = serializers.CharField(source="module.title", read_only=True)

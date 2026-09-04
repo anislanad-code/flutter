@@ -48,14 +48,14 @@ def test_la_sonde_est_exposee_sur_api_health() -> None:
     assert resolve("/api/health").func.view_class is HealthView  # type: ignore[attr-defined]
 
 
-def test_le_routage_n_expose_que_la_sonde_l_auth_le_catalogue_public_et_l_admin() -> None:
+def test_le_routage_n_expose_que_la_sonde_les_includes_connus_et_l_admin() -> None:
     """Garde-fou : toute route ajoutée sans test fait tomber celui-ci."""
     resolveurs = [e for e in get_resolver().url_patterns if isinstance(e, URLResolver)]
 
     assert _routes_applicatives() == ["api/health"]
-    # apps.accounts.urls (préfixe "api/"), apps.catalog.urls (préfixe "api/public/") et
-    # admin.site.urls, et rien d'autre.
-    assert len(resolveurs) == 3
+    # apps.accounts.urls, apps.catalog.urls_private et apps.enrollment.urls (préfixe
+    # "api/"), apps.catalog.urls (préfixe "api/public/"), et admin.site.urls. Rien d'autre.
+    assert len(resolveurs) == 5
 
 
 def test_les_routes_d_authentification_sont_exposees_sous_api() -> None:
@@ -77,6 +77,26 @@ def test_les_routes_du_catalogue_public_sont_exposees_sous_api_public() -> None:
     for nom in ["public-course-detail", "public-chapter-detail", "public-leads"]:
         chemin = reverse(nom, kwargs={"slug": "x"} if nom != "public-leads" else {})
         assert chemin.startswith("/api/public/")
+
+
+def test_les_routes_de_l_inscription_payante_sont_exposees_sous_api() -> None:
+    assert reverse("enrollment-status") == "/api/enrollment/status"
+    assert reverse("enrollment-proof") == "/api/enrollment/proof"
+    assert reverse("admin-enrollments") == "/api/admin/enrollments"
+    assert reverse("admin-enrollment-accept", kwargs={"enrollment_id": 1}).startswith(
+        "/api/admin/enrollments/"
+    )
+    assert reverse("admin-enrollment-reject", kwargs={"enrollment_id": 1}).startswith(
+        "/api/admin/enrollments/"
+    )
+
+
+def test_le_chapitre_authentifie_n_est_pas_sous_le_prefixe_public() -> None:
+    """Une route qui sert du contenu payant ne doit jamais vivre sous « /api/public/ »."""
+    chemin = reverse("chapter-detail", kwargs={"slug": "x"})
+
+    assert chemin == "/api/chapters/x"
+    assert not chemin.startswith("/api/public/")
 
 
 @pytest.mark.django_db

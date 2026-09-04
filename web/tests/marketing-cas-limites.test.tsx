@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { LecteurChapitreGratuit } from "@/components/marketing/LecteurChapitreGratuit";
+import { LecteurChapitre } from "@/components/course/LecteurChapitre";
 import { Parcours } from "@/components/marketing/Parcours";
 import { analyserTranscript } from "@/lib/markdown-leger";
 import type { ChapitreGratuit, CoursPublic } from "@/lib/catalog-schemas";
@@ -160,7 +160,7 @@ describe("FormulaireListeAttente — états et clavier", () => {
   });
 });
 
-describe("LecteurChapitreGratuit — contenu hostile ou incomplet", () => {
+describe("LecteurChapitre — contenu hostile ou incomplet", () => {
   it("échappe le HTML d'un transcript au lieu de l'injecter (§8.8, XSS stocké)", () => {
     const hostile: ChapitreGratuit = {
       ...CHAPITRE,
@@ -171,7 +171,7 @@ describe("LecteurChapitreGratuit — contenu hostile ou incomplet", () => {
       },
     };
 
-    const html = renderToStaticMarkup(createElement(LecteurChapitreGratuit, { chapitre: hostile }));
+    const html = renderToStaticMarkup(createElement(LecteurChapitre, { chapitre: hostile }));
 
     expect(html).not.toContain("<img src=x");
     expect(html).not.toContain("<script>alert(2)</script>");
@@ -184,7 +184,7 @@ describe("LecteurChapitreGratuit — contenu hostile ou incomplet", () => {
       lesson: { ...CHAPITRE.lesson, transcript: "" },
     };
 
-    const html = renderToStaticMarkup(createElement(LecteurChapitreGratuit, { chapitre: vide }));
+    const html = renderToStaticMarkup(createElement(LecteurChapitre, { chapitre: vide }));
 
     // Le conteneur des blocs du transcript reste vide (le reste, c'est le lecteur).
     expect(html).toContain('<div class="flex flex-col gap-4"></div>');
@@ -192,7 +192,7 @@ describe("LecteurChapitreGratuit — contenu hostile ou incomplet", () => {
   });
 
   it("affiche l'état d'attente tant qu'aucune vidéo n'est déposée", () => {
-    const html = renderToStaticMarkup(createElement(LecteurChapitreGratuit, { chapitre: CHAPITRE }));
+    const html = renderToStaticMarkup(createElement(LecteurChapitre, { chapitre: CHAPITRE }));
 
     expect(html).not.toContain("<video");
     expect(html).toContain("à venir");
@@ -208,7 +208,7 @@ describe("LecteurChapitreGratuit — contenu hostile ou incomplet", () => {
     };
 
     const html = renderToStaticMarkup(
-      createElement(LecteurChapitreGratuit, { chapitre: avecVideo }),
+      createElement(LecteurChapitre, { chapitre: avecVideo }),
     );
 
     expect(html).not.toMatch(/\.(mp4|m3u8|webm|mkv)\b/i);

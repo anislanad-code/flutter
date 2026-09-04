@@ -27,7 +27,7 @@ from apps.accounts.tokens import (
     refresh_expiry,
     reset_token_expiry,
 )
-from apps.enrollment.models import Enrollment
+from apps.enrollment.services import creer_inscription_initiale
 
 # Hachage constant comparé quand l'utilisateur n'existe pas, pour que la durée d'un
 # échec « mauvais mot de passe » et d'un échec « compte inconnu » soit la même (§4.2).
@@ -104,7 +104,9 @@ def enregistrer(*, email: str, phone: str, password: str) -> None:
         return
 
     user = User.objects.create_user(email=email_normalise, phone=phone, password=password)
-    Enrollment.objects.create(user=user, status=Enrollment.Status.PENDING)
+    # `PENDING`, rattachée à la formation publiée s'il n'y en a qu'une (§1 : le lien
+    # vers « la » formation n'est jamais codé en dur).
+    creer_inscription_initiale(user)
     envoyer_email_bienvenue(user)
 
 

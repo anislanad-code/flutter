@@ -8,6 +8,8 @@ import { cleanup, render, screen } from "@testing-library/react";
    client (§4.3). */
 
 const utilisateurCourant = vi.hoisted(() => vi.fn());
+const recupererEtatInscription = vi.hoisted(() => vi.fn());
+const recupererCours = vi.hoisted(() => vi.fn());
 const redirect = vi.hoisted(() =>
   vi.fn((cible: string) => {
     throw new Error(`REDIRECT:${cible}`);
@@ -15,6 +17,11 @@ const redirect = vi.hoisted(() =>
 );
 
 vi.mock("@/lib/current-user", () => ({ utilisateurCourant }));
+vi.mock("@/lib/enrollment", () => ({ recupererEtatInscription }));
+vi.mock("@/lib/catalog", () => ({
+  recupererCours,
+  SLUG_FORMATION_PRINCIPALE: "flutter-firebase-debutants",
+}));
 vi.mock("next/navigation", () => ({
   redirect,
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -41,6 +48,8 @@ const ADMIN = { ...ETUDIANTE, id: 1, email: "anis@example.com", is_staff: true }
 
 beforeEach(() => {
   utilisateurCourant.mockReset();
+  recupererEtatInscription.mockReset().mockResolvedValue(null);
+  recupererCours.mockReset().mockResolvedValue(null);
   redirect.mockClear();
   vi.stubGlobal("fetch", vi.fn());
 });
@@ -96,7 +105,8 @@ describe("/app — espace étudiant", () => {
     utilisateurCourant.mockResolvedValue(ETUDIANTE);
     render(await pageEtudiant.default());
 
-    expect(screen.getByRole("heading", { name: /etudiante@example.com/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Ton parcours" })).toBeTruthy();
+    expect(screen.getByText("etudiante@example.com")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Se déconnecter" })).toBeTruthy();
     expect(redirect).not.toHaveBeenCalled();
   });
