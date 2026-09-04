@@ -250,6 +250,45 @@ describe("FormulaireInscription", () => {
       phone: "0550112233",
       password: "un-mot-de-passe-long",
     });
+
+    // L'inscription ne connecte plus automatiquement (correctif d'énumération) :
+    // le formulaire enchaîne un vrai POST /api/auth/login, sans le téléphone.
+    const connexion = appelFetch(1);
+    expect(connexion.url).toBe("/api/auth/login");
+    expect(connexion.corps).toEqual({
+      email: "nouvelle@example.com",
+      password: "un-mot-de-passe-long",
+    });
+  });
+
+  it("email déjà pris : la connexion enchaînée échoue, message neutre, pas de redirection", async () => {
+    // C'est ici que se joue l'absence d'énumération : Django a répondu 201 dans les deux
+    // cas ; seule la connexion distingue « compte créé » de « email déjà pris », et elle
+    // le fait avec le vocabulaire d'un échec de connexion ordinaire.
+    fetchMock
+      .mockResolvedValueOnce(reponse(201, { detail: "Compte créé si l'email était disponible." }))
+      .mockResolvedValueOnce(reponse(401, { detail: "Email ou mot de passe incorrect." }));
+    render(<FormulaireInscription />);
+
+    await userEvent.type(screen.getByLabelText("Email"), "deja-prise@example.com");
+    await userEvent.type(screen.getByLabelText("Mot de passe"), "un-mot-de-passe-long");
+    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+
+    const alerte = await screen.findByRole("alert");
+    expect(alerte.textContent).toBe("Compte créé. Connecte-toi pour continuer.");
+    expect(alerte.textContent).not.toMatch(/existe|déjà|pris/i);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("aucun cookie n'est attendu de /api/auth/register : deux appels, jamais un seul", async () => {
+    fetchMock.mockResolvedValue(reponse(201, {}));
+    render(<FormulaireInscription />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(appelFetch(0).url).toBe("/api/auth/register");
+    expect(appelFetch(1).url).toBe("/api/auth/login");
   });
 
   it("400 sur le mot de passe : le message de Django est rattaché au champ", async () => {

@@ -19,6 +19,8 @@ export function FormulaireMotDePasseOublie() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+    } catch {
+      // Ignoré volontairement : même écran de succès quoi qu'il arrive (voir plus bas).
     } finally {
       // Même comportement que la réponse échoue ou réussisse : rien ne doit distinguer
       // un email inconnu d'un email connu (§4.2).

@@ -11,6 +11,8 @@ export function BoutonDeconnexion() {
     setEnCours(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Ignoré volontairement : on redirige quand même (voir plus bas).
     } finally {
       router.push("/connexion");
       router.refresh();
