@@ -41,6 +41,22 @@ export function FormulaireInscription() {
         return;
       }
 
+      // L'inscription ne connecte jamais automatiquement (§4.2 — voir le commentaire
+      // de app/api/auth/register/route.ts) : on enchaîne une vraie connexion avec les
+      // identifiants du formulaire. Si l'email appartenait déjà à quelqu'un d'autre,
+      // cette connexion échoue simplement — sans jamais le dire autrement qu'un échec
+      // de connexion ordinaire.
+      const connexion = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!connexion.ok) {
+        setErreurGenerale("Compte créé. Connecte-toi pour continuer.");
+        return;
+      }
+
       router.push("/app");
       router.refresh();
     } catch {
@@ -78,7 +94,7 @@ export function FormulaireInscription() {
         onChange={setPassword}
         erreur={erreurMotDePasse ?? undefined}
       />
-      <p className="text-[length:var(--texte-sm)] text-muted">
+      <p className="text-[length:var(--texte-sm)] text-ink">
         Au moins 10 caractères, pas un mot de passe courant.
       </p>
 

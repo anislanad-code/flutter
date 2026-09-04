@@ -3,8 +3,6 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 
 import { apiFetch } from "@/lib/api";
-import { poserCookiesAuth } from "@/lib/auth-cookies";
-import { sessionEmiseSchema } from "@/lib/auth-schemas";
 import { ipDuVisiteur } from "@/lib/client-ip";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +13,15 @@ const corpsSchema = z.object({
   password: z.string(),
 });
 
+const MESSAGE_GENERIQUE = "Compte créé si l'email était disponible. Connecte-toi pour continuer.";
+
+/* Django ne connecte jamais automatiquement à l'inscription : une réponse qui varie
+   selon que le compte existait déjà (avec ou sans tokens) est un oracle d'énumération
+   à elle seule, même à statut identique (§4.2 — constaté ÉLEVÉ par la porte de
+   sécurité de l'étape 1). Cette route relaie donc toujours la même réponse générique
+   et ne pose jamais de cookie ; c'est `POST /api/auth/login`, appelé séparément par le
+   formulaire avec les mêmes identifiants, qui connecte réellement l'utilisateur — et
+   qui est lui-même déjà audité pour ne rien révéler sur l'existence du compte. */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const corps = corpsSchema.safeParse(await request.json().catch(() => null));
   if (!corps.success) {
@@ -44,16 +51,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(result.data as Record<string, unknown>, { status: 400 });
   }
 
-  const parsed = sessionEmiseSchema.safeParse(result.data);
-  if (!parsed.success) {
-    // Cas normal : email déjà pris (§4.2, pas d'énumération) — même statut, sans session.
-    return NextResponse.json(
-      { detail: "Compte créé si l'email était disponible. Connecte-toi pour continuer." },
-      { status: 201 },
-    );
-  }
-
-  const reponse = NextResponse.json({ user: parsed.data.user }, { status: 201 });
-  poserCookiesAuth(reponse, parsed.data);
-  return reponse;
+  return NextResponse.json({ detail: MESSAGE_GENERIQUE }, { status: 201 });
 }

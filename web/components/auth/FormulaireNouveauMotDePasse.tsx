@@ -67,7 +67,7 @@ export function FormulaireNouveauMotDePasse() {
         onChange={setPassword}
         erreur={erreur ?? undefined}
       />
-      <p className="text-[length:var(--texte-sm)] text-muted">
+      <p className="text-[length:var(--texte-sm)] text-ink">
         Au moins 10 caractères, pas un mot de passe courant.
       </p>
 

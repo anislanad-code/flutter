@@ -70,22 +70,17 @@ class RegisterView(APIView):
         except services.MotDePasseInvalideError as exc:
             return Response({"password": exc.erreurs}, status=400)
 
-        # Enchaîne une connexion : ne réussit que si le compte vient d'être créé avec
-        # ces identifiants (voir le commentaire de `services.enregistrer`).
-        try:
-            emise = services.connecter(
-                email=data["email"],
-                password=data["password"],
-                device_fingerprint=_device_fingerprint(request),
-                ip_prefix=compute_ip_prefix(ip),
-            )
-        except services.IdentifiantsInvalidesError:
-            return Response(
-                {"detail": "Compte créé si l'email était disponible. Connecte-toi pour continuer."},
-                status=201,
-            )
-
-        return _session_response(emise, status_code=201)
+        # Jamais de connexion automatique ici : une réponse qui varie selon que le
+        # compte vient d'être créé ou existait déjà (avec ou sans tokens, avec ou sans
+        # Set-Cookie) est un oracle d'énumération à elle seule, même à statut et corps
+        # identiques (§4.2 — constaté ÉLEVÉ par la porte de sécurité de l'étape 1). Le
+        # BFF (web/app/api/auth/register) enchaîne un vrai `POST /api/auth/login` côté
+        # client avec les mêmes identifiants : cette étape suivante est déjà auditée
+        # pour ne rien révéler (message et timing identiques compte connu/inconnu).
+        return Response(
+            {"detail": "Compte créé si l'email était disponible. Connecte-toi pour continuer."},
+            status=201,
+        )
 
 
 class LoginView(APIView):

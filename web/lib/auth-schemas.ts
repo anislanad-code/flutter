@@ -7,7 +7,8 @@ export const utilisateurSchema = z.object({
   email: z.string(),
   phone: z.string(),
   is_staff: z.boolean(),
-  flagged_for_review: z.boolean(),
+  // `flagged_for_review` n'est délibérément pas exposé par Django (voir MeSerializer) :
+  // c'est un signal interne à l'admin, jamais révélé au compte signalé lui-même.
   created_at: z.string(),
   last_activity_at: z.string().nullable(),
 });

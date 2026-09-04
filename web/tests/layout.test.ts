@@ -58,6 +58,19 @@ describe("RootLayout", () => {
     expect(html).not.toContain("https://");
   });
 
+  it("sans en-tête x-nonce, rend quand même la page (pas de crash au build)", async () => {
+    enTetes.delete("x-nonce");
+    try {
+      const sansNonce = renderToStaticMarkup(
+        await RootLayout({ children: createElement("p", null, "contenu") }),
+      );
+      expect(sansNonce).toContain("<p>contenu</p>");
+      expect(sansNonce).not.toContain("nonce-de-test");
+    } finally {
+      enTetes.set("x-nonce", "nonce-de-test");
+    }
+  });
+
   it("porte des métadonnées de marque, sans mention d'une formation en dur", () => {
     expect(String(metadata.title)).toContain("anis.dev");
     expect(String(metadata.description)).not.toBe("");

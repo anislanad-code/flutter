@@ -36,15 +36,12 @@ class PasswordResetConfirmSerializer(serializers.Serializer):  # type: ignore[ty
 
 
 class MeSerializer(serializers.ModelSerializer[User]):
+    """`flagged_for_review` est délibérément absent : c'est un signal interne à l'admin
+    (§4.1.6 — jamais de blocage automatique, juste une remontée). Le révéler au compte
+    signalé lui-même l'aiderait à ajuster son comportement pour passer sous les seuils.
+    """
+
     class Meta:
         model = User
-        fields = [
-            "id",
-            "email",
-            "phone",
-            "is_staff",
-            "flagged_for_review",
-            "created_at",
-            "last_activity_at",
-        ]
+        fields = ["id", "email", "phone", "is_staff", "created_at", "last_activity_at"]
         read_only_fields = fields

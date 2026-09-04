@@ -23,7 +23,6 @@ const SESSION_OK = {
     email: "etudiante@example.com",
     phone: "",
     is_staff: false,
-    flagged_for_review: false,
     created_at: "2026-01-01T00:00:00Z",
     last_activity_at: null,
   },
@@ -44,29 +43,10 @@ beforeEach(() => {
 });
 
 describe("POST /api/auth/register", () => {
-  it("pose les cookies httpOnly quand le compte est bien créé", async () => {
-    apiFetch.mockResolvedValue({ ok: true, status: 201, data: SESSION_OK });
-
-    const reponse = await register(
-      requeteJson("https://anis.dev/api/auth/register", {
-        email: "e@example.com",
-        password: "un-mot-de-passe-solide-1",
-      }),
-    );
-
-    expect(reponse.status).toBe(201);
-    const cookieSession = reponse.cookies.get("session");
-    expect(cookieSession?.value).toBe("acces-123");
-    expect(cookieSession?.httpOnly).toBe(true);
-    expect(cookieSession?.sameSite).toBe("strict");
-    // Le token brut ne doit jamais apparaître dans le corps JSON renvoyé au navigateur.
-    const corps = JSON.stringify(await reponse.clone().json());
-    expect(corps).not.toContain("acces-123");
-  });
-
-  it("renvoie la même réponse générique sans poser de cookie si l'email existait déjà", async () => {
-    // Django renvoie 201 sans session (voir services.enregistrer) : le zod-parse du
-    // schéma de session échoue, ce qui déclenche le message générique anti-énumération.
+  it("ne pose jamais de cookie, même quand le compte est bien créé", async () => {
+    // Django ne renvoie plus jamais de session au register (voir services.enregistrer) :
+    // une réponse qui varie selon que le compte existait déjà (avec ou sans cookie) est
+    // un oracle d'énumération à elle seule, même à statut et corps identiques (§4.2).
     apiFetch.mockResolvedValue({
       ok: true,
       status: 201,
@@ -82,6 +62,31 @@ describe("POST /api/auth/register", () => {
 
     expect(reponse.status).toBe(201);
     expect(reponse.cookies.get("session")).toBeUndefined();
+    expect(reponse.cookies.get("refresh")).toBeUndefined();
+  });
+
+  it("renvoie la même réponse, statut et corps, que l'email existe déjà ou non", async () => {
+    apiFetch.mockResolvedValue({
+      ok: true,
+      status: 201,
+      data: { detail: "Compte créé si l'email était disponible. Connecte-toi pour continuer." },
+    });
+
+    const nouveau = await register(
+      requeteJson("https://anis.dev/api/auth/register", {
+        email: "nouveau@example.com",
+        password: "un-mot-de-passe-solide-1",
+      }),
+    );
+    const existant = await register(
+      requeteJson("https://anis.dev/api/auth/register", {
+        email: "existant@example.com",
+        password: "un-mot-de-passe-solide-1",
+      }),
+    );
+
+    expect(nouveau.status).toBe(existant.status);
+    await expect(nouveau.json()).resolves.toEqual(await existant.json());
   });
 
   it("relaie les erreurs de mot de passe (400) sans les transformer", async () => {

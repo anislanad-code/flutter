@@ -20,7 +20,7 @@ export default async function PageEspaceEtudiant() {
         <h1 className="font-titre text-[length:var(--texte-3xl)] font-semibold text-ink">
           Bienvenue, {utilisateur.email}
         </h1>
-        <p className="text-[length:var(--texte-base)] text-muted">
+        <p className="text-[length:var(--texte-base)] text-ink">
           Le parcours et le chapitre gratuit arrivent à l&apos;étape 2.
         </p>
       </header>

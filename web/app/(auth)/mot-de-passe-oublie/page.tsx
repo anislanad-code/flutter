@@ -11,7 +11,7 @@ export default function PageMotDePasseOublie() {
         <h1 className="font-titre text-[length:var(--texte-3xl)] font-semibold text-ink">
           Mot de passe oublié
         </h1>
-        <p className="text-[length:var(--texte-base)] text-muted">
+        <p className="text-[length:var(--texte-base)] text-ink">
           Indique ton email : on t&apos;envoie un lien pour en choisir un nouveau.
         </p>
       </header>

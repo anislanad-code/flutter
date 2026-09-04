@@ -16,7 +16,7 @@ export default function PageConnexion() {
       <Suspense>
         <FormulaireConnexion />
       </Suspense>
-      <p className="text-center text-[length:var(--texte-sm)] text-muted">
+      <p className="text-center text-[length:var(--texte-sm)] text-ink">
         Pas encore de compte ?{" "}
         <a href="/inscription" className="text-zellige underline underline-offset-4">
           Crée-en un

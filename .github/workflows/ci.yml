@@ -121,12 +121,17 @@ jobs:
       # régression. Attention : la légende du tableau ("○  (Static)   prerendered
       # as static content") contient elle aussi la sous-chaîne "(Static)" — un grep
       # sur "(Static)" seul matche donc TOUJOURS, même sans aucune route statique.
-      # On ne regarde que les vraies lignes de route (préfixées par ├/└), et on
-      # exclut `/icon.svg` : c'est une route de métadonnées (favicon) générée par
+      # On ne regarde que les vraies lignes de route (celles qui contiennent un chemin,
+      # donc un "/"), pas la légende. Un motif d'ancrage sur les caractères de l'arbre
+      # (┌/├/└) est fragile : ce sont des caractères UTF-8 multi-octets, et un bracket
+      # expression sur des octets multi-octets dépend de la locale du runner — vérifié
+      # cassé en locale C/POSIX. "○" utilisé en dehors d'un bracket expression, lui,
+      # est comparé littéralement quelle que soit la locale.
+      # On exclut `/icon.svg` : c'est une route de métadonnées (favicon) générée par
       # Next, jamais du HTML avec des <script>, donc hors du champ de la CSP à nonce.
       - name: Aucune route prérendue en statique
         run: |
-          if npm run build 2>&1 | grep -E "^[├└] ○" | grep -qvE "/icon\.svg"; then
+          if npm run build 2>&1 | grep -E "○" | grep -E "/" | grep -qvE "/icon\.svg"; then
             echo "::error::une route est prérendue en statique : la CSP à nonce la casse"
             exit 1
           fi

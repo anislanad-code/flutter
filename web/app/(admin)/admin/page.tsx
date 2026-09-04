@@ -20,7 +20,7 @@ export default async function PageAdmin() {
         <h1 className="font-titre text-[length:var(--texte-3xl)] font-semibold text-ink">
           Administration
         </h1>
-        <p className="text-[length:var(--texte-base)] text-muted">
+        <p className="text-[length:var(--texte-base)] text-ink">
           Le tableau de bord arrive à l&apos;étape 7.
         </p>
       </header>

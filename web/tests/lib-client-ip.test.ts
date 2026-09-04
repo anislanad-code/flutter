@@ -19,4 +19,14 @@ describe("ipDuVisiteur", () => {
   it("renvoie une chaîne vide sans aucun des deux en-têtes", () => {
     expect(ipDuVisiteur(requete({}))).toBe("");
   });
+
+  it("ignore un X-Forwarded-For vide et retombe sur X-Real-IP", () => {
+    expect(ipDuVisiteur(requete({ "x-forwarded-for": "", "x-real-ip": "9.9.9.9" }))).toBe(
+      "9.9.9.9",
+    );
+  });
+
+  it("découpe une valeur dégénérée sans lever d'exception", () => {
+    expect(ipDuVisiteur(requete({ "x-forwarded-for": " , 5.6.7.8" }))).toBe("");
+  });
 });

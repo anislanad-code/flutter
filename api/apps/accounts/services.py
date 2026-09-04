@@ -84,11 +84,12 @@ def enregistrer(*, email: str, phone: str, password: str) -> None:
     """Crée le compte + un `Enrollment` PENDING.
 
     Ne renvoie jamais d'indication sur l'existence préalable de l'email (§4.2) : la vue
-    répond toujours la même chose. Volontairement, cette fonction n'émet **pas** de
-    session — si l'email appartenait déjà à quelqu'un d'autre, créer une session ici
-    connecterait l'appelant sur le compte d'un tiers. L'appelant (la vue / le BFF)
-    enchaîne un `connecter()` avec les mêmes identifiants : ça ne réussit que si le
-    compte vient vraiment d'être créé avec ce mot de passe.
+    répond toujours la même chose, sans jamais émettre de session ici — un compte déjà
+    pris et un compte nouvellement créé doivent produire une réponse HTTP strictement
+    identique (statut, corps, en-têtes), pas seulement un message identique. Se
+    connecter est une étape séparée et volontaire : le BFF (web/app/api/auth/register)
+    enchaîne un vrai `POST /api/auth/login` côté client avec les mêmes identifiants,
+    lui-même déjà audité pour ne rien révéler sur l'existence du compte.
     """
     email_normalise = email.strip().lower()
 
