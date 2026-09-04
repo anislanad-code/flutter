@@ -14,6 +14,10 @@ export type ApiOptions = {
       Sans cette liste, un corps d'erreur de Django n'est jamais relayé : il peut
       contenir une trace, un nom de table ou un détail interne. */
   readonly acceptStatuses?: readonly number[];
+  /** Contenu public et non personnalisé (catalogue, landing) : mis en cache ce nombre
+      de secondes plutôt que refait à chaque requête. Absent = `no-store`, le défaut
+      sûr pour tout ce qui dépend d'un cookie de session. */
+  readonly revalidateSeconds?: number;
 };
 
 const TIMEOUT_MS = 8_000;
@@ -40,7 +44,9 @@ export async function apiFetch<T>(
       ...init,
       signal: controller.signal,
       headers,
-      cache: "no-store",
+      ...(options.revalidateSeconds !== undefined
+        ? { next: { revalidate: options.revalidateSeconds } }
+        : { cache: "no-store" }),
     });
 
     const body: unknown = await response.json().catch(() => null);

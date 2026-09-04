@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, JetBrains_Mono, Public_Sans } from "next/font/google";
 import { headers } from "next/headers";
 
+import { serverEnv } from "@/lib/env-public";
+
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -23,6 +25,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(serverEnv().NEXT_PUBLIC_SITE_URL),
   title: "anis.dev — Formations tech en français",
   description:
     "Apprends à construire des applications mobiles avec Flutter et Firebase, en partant de zéro.",

@@ -48,13 +48,14 @@ def test_la_sonde_est_exposee_sur_api_health() -> None:
     assert resolve("/api/health").func.view_class is HealthView  # type: ignore[attr-defined]
 
 
-def test_le_routage_n_expose_que_la_sonde_l_auth_et_l_admin() -> None:
+def test_le_routage_n_expose_que_la_sonde_l_auth_le_catalogue_public_et_l_admin() -> None:
     """Garde-fou : toute route ajoutée sans test fait tomber celui-ci."""
     resolveurs = [e for e in get_resolver().url_patterns if isinstance(e, URLResolver)]
 
     assert _routes_applicatives() == ["api/health"]
-    # apps.accounts.urls (préfixe "api/") et admin.site.urls, et rien d'autre.
-    assert len(resolveurs) == 2
+    # apps.accounts.urls (préfixe "api/"), apps.catalog.urls (préfixe "api/public/") et
+    # admin.site.urls, et rien d'autre.
+    assert len(resolveurs) == 3
 
 
 def test_les_routes_d_authentification_sont_exposees_sous_api() -> None:
@@ -70,6 +71,12 @@ def test_les_routes_d_authentification_sont_exposees_sous_api() -> None:
     ]
     for nom in noms:
         assert reverse(nom).startswith("/api/")
+
+
+def test_les_routes_du_catalogue_public_sont_exposees_sous_api_public() -> None:
+    for nom in ["public-course-detail", "public-chapter-detail", "public-leads"]:
+        chemin = reverse(nom, kwargs={"slug": "x"} if nom != "public-leads" else {})
+        assert chemin.startswith("/api/public/")
 
 
 @pytest.mark.django_db

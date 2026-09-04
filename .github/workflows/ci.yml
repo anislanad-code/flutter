@@ -127,11 +127,12 @@ jobs:
       # expression sur des octets multi-octets dépend de la locale du runner — vérifié
       # cassé en locale C/POSIX. "○" utilisé en dehors d'un bracket expression, lui,
       # est comparé littéralement quelle que soit la locale.
-      # On exclut `/icon.svg` : c'est une route de métadonnées (favicon) générée par
-      # Next, jamais du HTML avec des <script>, donc hors du champ de la CSP à nonce.
+      # On exclut `/icon.svg`, `/robots.txt` et `/sitemap.xml` : ce sont des routes de
+      # métadonnées générées par Next (favicon, robots, sitemap), jamais du HTML avec
+      # des <script>, donc hors du champ de la CSP à nonce (étape 2).
       - name: Aucune route prérendue en statique
         run: |
-          if npm run build 2>&1 | grep -E "○" | grep -E "/" | grep -qvE "/icon\.svg"; then
+          if npm run build 2>&1 | grep -E "○" | grep -E "/" | grep -qvE "/icon\.svg|/robots\.txt|/sitemap\.xml"; then
             echo "::error::une route est prérendue en statique : la CSP à nonce la casse"
             exit 1
           fi
