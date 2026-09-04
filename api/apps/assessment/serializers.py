@@ -79,9 +79,7 @@ class SubmitRequestSerializer(serializers.Serializer[dict[str, object]]):
     la même validation de forme côté client, mais le serveur ne lui fait pas confiance).
     """
 
-    answers = serializers.DictField(
-        child=serializers.IntegerField(min_value=1), allow_empty=True
-    )
+    answers = serializers.DictField(child=serializers.IntegerField(min_value=1), allow_empty=True)
 
     def validate_answers(self, value: dict[str, int]) -> dict[int, int]:
         resultat: dict[int, int] = {}

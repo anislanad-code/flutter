@@ -107,8 +107,7 @@ def bonnes_reponses(quiz: Quiz) -> dict[int, int]:
 
 def mauvaises_reponses(quiz: Quiz) -> dict[int, int]:
     return {
-        q.id: next(c.id for c in q.choices.all() if not c.is_correct)
-        for q in quiz.questions.all()
+        q.id: next(c.id for c in q.choices.all() if not c.is_correct) for q in quiz.questions.all()
     }
 
 

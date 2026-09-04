@@ -307,9 +307,7 @@ def test_soumettre_refuse_une_cle_de_question_non_numerique(
 
 
 def test_soumettre_404_sur_une_tentative_inexistante(client_etudiante: APIClient) -> None:
-    response = client_etudiante.post(
-        "/api/attempts/999999/submit", {"answers": {}}, format="json"
-    )
+    response = client_etudiante.post("/api/attempts/999999/submit", {"answers": {}}, format="json")
     assert response.status_code == 404
 
 

@@ -93,6 +93,38 @@ describe("recupererQuiz", () => {
     expect(resultat).toEqual({ ok: false, raison: "indisponible" });
   });
 
+  it("un 429 devient « indisponible », jamais « inaccessible »", async () => {
+    /* Un excès de débit ne doit pas se transformer en 404 côté page : l'étudiant
+       croirait que son QCM n'existe pas au lieu de savoir qu'il doit réessayer. */
+    apiFetch.mockResolvedValue({
+      ok: true,
+      status: 429,
+      data: { detail: "Trop de tentatives. Réessaie plus tard." },
+    });
+
+    const resultat = await recupererQuiz(1);
+
+    expect(resultat).toEqual({ ok: false, raison: "indisponible" });
+  });
+
+  it("un 401 (session expirée entre-temps) devient « indisponible », pas un quiz vide", async () => {
+    apiFetch.mockResolvedValue({ ok: true, status: 401, data: { detail: "Non authentifié." } });
+
+    const resultat = await recupererQuiz(1);
+
+    expect(resultat).toEqual({ ok: false, raison: "indisponible" });
+  });
+
+  it("le quiz demandé est celui de l'identifiant, sans en-tête forgé ni cache", async () => {
+    apiFetch.mockResolvedValue({ ok: true, status: 200, data: QUIZ });
+
+    await recupererQuiz(42);
+
+    expect(apiFetch).toHaveBeenCalledWith("/api/quizzes/42", expect.anything(), {
+      acceptStatuses: [401, 404, 429],
+    });
+  });
+
   it("un champ interne parasite (ex. is_correct) est filtré par le schéma, jamais relayé", async () => {
     apiFetch.mockResolvedValue({
       ok: true,

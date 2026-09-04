@@ -68,9 +68,7 @@ class Question(models.Model):
     class Meta:
         ordering = ["order"]
         constraints = [
-            models.UniqueConstraint(
-                fields=["quiz", "order"], name="question_ordre_unique_par_quiz"
-            )
+            models.UniqueConstraint(fields=["quiz", "order"], name="question_ordre_unique_par_quiz")
         ]
 
     def __str__(self) -> str:

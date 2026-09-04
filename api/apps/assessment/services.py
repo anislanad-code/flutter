@@ -44,13 +44,23 @@ class ReponsesInvalidesError(Exception):
 def a_acces_au_quiz(*, user: User, quiz: Quiz) -> bool:
     """Un QCM de chapitre suit exactement la règle du chapitre (§4.4) ; un examen de
     module n'est jamais gratuit — seul le premier chapitre l'est, pas le module entier.
+
+    Une formation non publiée ne sert aucun contenu, quiz compris — même son chapitre
+    `is_free` — exactement comme `ChapterDetailView` (§4.4) : un id de quiz deviné
+    (auto-incrément) ne doit rien révéler d'une formation encore en préparation.
     """
     chapter = quiz.chapter
     if chapter is not None:
-        return chapter.is_free or a_acces_au_contenu(user, chapter.module.course)
+        course = chapter.module.course
+        if not course.is_published:
+            return False
+        return chapter.is_free or a_acces_au_contenu(user, course)
     module = quiz.module
     assert module is not None  # garanti par la contrainte `quiz_xor_chapitre_module`
-    return a_acces_au_contenu(user, module.course)
+    course = module.course
+    if not course.is_published:
+        return False
+    return a_acces_au_contenu(user, course)
 
 
 # --- Lecture (GET /api/quizzes/{id}) ----------------------------------------
@@ -90,9 +100,9 @@ def _tentatives_soumises(*, user: User, quiz: Quiz) -> int:
 def etat_quiz(*, user: User, quiz: Quiz) -> EtatQuiz:
     """Aucun champ `is_correct` ici (§4.4) : `ChoixPublic` ne porte que `id` et `text`."""
     soumises = _tentatives_soumises(user=user, quiz=quiz)
-    meilleur = Attempt.objects.filter(
-        user=user, quiz=quiz, submitted_at__isnull=False
-    ).aggregate(m=Max("score"))["m"]
+    meilleur = Attempt.objects.filter(user=user, quiz=quiz, submitted_at__isnull=False).aggregate(
+        m=Max("score")
+    )["m"]
 
     questions = [
         QuestionPublique(
@@ -207,9 +217,7 @@ def soumettre_tentative(
     if ecoule_s < tentative.quiz.min_duration_s:
         raise SoumissionTropRapideError
 
-    questions = list(
-        Question.objects.filter(quiz=tentative.quiz).prefetch_related("choices")
-    )
+    questions = list(Question.objects.filter(quiz=tentative.quiz).prefetch_related("choices"))
     ids_questions_valides = {q.id for q in questions}
     if any(qid not in ids_questions_valides for qid in reponses):
         raise ReponsesInvalidesError
