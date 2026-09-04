@@ -153,7 +153,7 @@ Créer un compte → recevoir l'email de bienvenue (console en dev) → se déco
 
 ---
 
-## Étape 2 — Landing publique et chapitre gratuit
+## Étape 2 — Landing publique et chapitre gratuit  `[~]` porte franchie, 2 critères honnêtement non vérifiés
 
 **Objectif.** Un visiteur découvre la formation et regarde gratuitement le Module 0 / Chapitre 1, sans compte payant. C'est le haut de l'entonnoir : cette page vend.
 
@@ -174,13 +174,54 @@ Créer un compte → recevoir l'email de bienvenue (console en dev) → se déco
 En navigation privée, arriver sur `/`, lire le chapitre gratuit en entier, laisser son email, puis tenter d'accéder à un chapitre payant par URL directe → 404 propre, pas de fuite de titre ni de contenu.
 
 **Terminé quand**
-- [ ] La landing est rédigée avec du vrai contenu, pas de placeholder
-- [ ] Le chapitre gratuit est jouable sans compte
-- [ ] Tout chapitre `is_free = false` est inaccessible par tous les chemins (API, route Next, HTML du SSR)
-- [ ] Lighthouse mobile ≥ 90 perf et a11y
-- [ ] Design relu contre le skill frontend-design : aucun des tells listés dans CLAUDE.md §6 n'est présent
+- [x] La landing est rédigée avec du vrai contenu, pas de placeholder — *2026-09-04*
+- [ ] Le chapitre gratuit est jouable sans compte — *le chapitre se lit en entier sans compte
+      (transcript réel, ressources), mais il n'y a pas encore de vidéo qui joue : `Lesson.video_provider_id`
+      reste vide tant que Bunny n'est pas branché (étape 4), et le lecteur ne fabrique
+      jamais lui-même une URL de fichier — la porte de sécurité l'a d'abord attrapé en
+      BLOQUANT quand une première version le faisait (voir plus bas). Case laissée
+      ouverte : « jouable » n'est pas vrai au sens littéral avant l'étape 4.*
+- [x] Tout chapitre `is_free = false` est inaccessible par tous les chemins (API, route Next, HTML du SSR) — *2026-09-04, vérifié par exploitation réelle (curl, SSR de prod, payload RSC, sitemap) par security-tester*
+- [ ] Lighthouse mobile ≥ 90 perf et a11y — *non exécuté : pas d'audit Lighthouse réel lancé dans cette session (pas d'outillage Lighthouse configuré ici). À faire avant de considérer l'étape close.*
+- [ ] Design relu contre le skill frontend-design — *le skill `frontend-design` cité par CLAUDE.md §6 n'était pas disponible dans cette session. Le §6 a été appliqué de mémoire (palette, typographie, un seul mouvement, parcours en serpentin, interdits explicites), mais pas passé au crible du skill lui-même.*
 
-**Porte** — [ ] code-reviewer · [ ] code-tester · [ ] security-tester *(point 4 : contournement du paywall, y compris via le HTML rendu côté serveur)*
+**Porte** — [x] code-reviewer · [x] code-tester · [x] security-tester — *2026-09-04*
+
+> Porte fermée au premier passage : **3 BLOQUANT** (code-reviewer). Le plus grave : le lecteur
+> du chapitre gratuit fabriquait `src="/videos/{video_provider_id}.mp4"` côté client — une
+> URL de fichier vidéo directement rejouable, alors que §2 gèle Bunny Stream et interdit
+> tout MP4 public ou servi par Django, et que §4.1.1 interdit qu'une URL de fichier vidéo
+> atteigne le client. Corrigé : le lecteur affiche désormais toujours l'état d'attente
+> (aucune source fabriquée) tant que la lecture Bunny n'existe pas. Un deuxième BLOQUANT :
+> la migration `catalog` avait dérivé de `models.py` (un `help_text` changé après coup),
+> `makemigrations --check` échouait — squashée en un `0001_initial` propre. Un troisième :
+> `text-muted` sur `paper` mesure 4,17:1, sous le seuil AA 4,5:1 — même défaut relevé et
+> corrigé à l'étape 1, revenu plus large (14 occurrences au lieu de 6) parce que la landing
+> a été entièrement réécrite ; rebasculées en `text-ink`, le token du §6 n'a pas bougé.
+> Le security-tester, en parallèle, a trouvé un `</script>` non échappé dans le JSON-LD
+> (MOYEN, latent — bloqué par la CSP à nonce en l'état, mais faute par construction) et
+> deux MOYEN sur l'anti-bot des leads (`X-Forwarded-For` et `form_rendered_at` fournis par
+> le client — attendu, l'anti-bot de cette étape est volontairement minimal). Le code-tester
+> a par ailleurs mis le doigt, en écrivant ses propres tests, sur un oracle 404 : un
+> chapitre payant renvoyait un corps d'erreur différent (« No Chapter matches the given
+> query. ») d'un slug inexistant (« Non trouvé. ») — les deux vues lèvent maintenant
+> `Http404` sans argument, identiques dans tous les cas. Tout revérifié : **porte ouverte,
+> 0 BLOQUANT / CRITIQUE / ÉLEVÉ.** 254 tests backend (100 % sur `apps` + `config`), 263
+> tests frontend (99,57 % d'instructions, 100 % des lignes).
+
+**Reporté explicitement**
+
+- Le chapitre gratuit n'a pas encore de vidéo réelle : voir la case « jouable » ci-dessus.
+  Le composant lecteur (`LecteurVideo`) est écrit et testé pour les deux états (avec/sans
+  source), prêt à recevoir une vraie URL signée Bunny à l'étape 4.
+- L'anti-bot de `POST /api/public/leads` (honeypot + délai côté client) est contournable
+  par un attaquant qui forge `form_rendered_at` ou fait tourner `X-Forwarded-For` — les
+  deux MOYEN du security-tester. Accepté tel quel : c'est une liste d'attente marketing,
+  pas une frontière de sécurité, et le rate limit (5/h/IP) reste la même défense que
+  `apps.accounts` utilise déjà pour login/register.
+- Lighthouse et la relecture par le skill `frontend-design` n'ont pas pu être exécutés
+  dans cette session (outillage/skill absents). Deux cases de « terminé quand » restent
+  donc ouvertes malgré la porte fermée — voir ci-dessus.
 
 ---
 
