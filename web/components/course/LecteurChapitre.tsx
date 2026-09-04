@@ -1,3 +1,4 @@
+import { BoutonTerminerChapitre } from "@/components/course/BoutonTerminerChapitre";
 import { LecteurSecurise } from "@/components/course/LecteurSecurise";
 import type { Chapitre } from "@/lib/catalog-schemas";
 import { analyserTranscript } from "@/lib/markdown-leger";
@@ -9,9 +10,15 @@ import { analyserTranscript } from "@/lib/markdown-leger";
 
 type Props = {
   chapitre: Chapitre;
+  /** Faux sur `/gratuit/[chapitre]` (visiteur anonyme, pas de progression à suivre) ;
+   *  vrai sur `/app/chapitre/[chapitre]` (compte connecté, §5). */
+  avecSuiviDeProgression?: boolean;
 };
 
-export function LecteurChapitre({ chapitre }: Props) {
+export function LecteurChapitre({
+  chapitre,
+  avecSuiviDeProgression = false,
+}: Props) {
   const blocs = analyserTranscript(chapitre.lesson.transcript);
 
   return (
@@ -43,7 +50,10 @@ export function LecteurChapitre({ chapitre }: Props) {
             );
           }
           return (
-            <p key={index} className="max-w-mesure text-[length:var(--texte-base)] text-ink">
+            <p
+              key={index}
+              className="max-w-mesure text-[length:var(--texte-base)] text-ink"
+            >
               {bloc.texte}
             </p>
           );
@@ -52,7 +62,9 @@ export function LecteurChapitre({ chapitre }: Props) {
 
       {chapitre.lesson.resources.length > 0 ? (
         <div className="border-t border-muted/40 pt-6">
-          <h3 className="font-titre text-[length:var(--texte-lg)] font-semibold">Ressources</h3>
+          <h3 className="font-titre text-[length:var(--texte-lg)] font-semibold">
+            Ressources
+          </h3>
           <ul className="mt-3 flex flex-col gap-2">
             {chapitre.lesson.resources.map((ressource) => (
               <li key={ressource.url}>
@@ -66,6 +78,12 @@ export function LecteurChapitre({ chapitre }: Props) {
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {avecSuiviDeProgression ? (
+        <div className="border-t border-muted/40 pt-6">
+          <BoutonTerminerChapitre chapitreSlug={chapitre.slug} />
         </div>
       ) : null}
     </div>

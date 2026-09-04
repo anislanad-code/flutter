@@ -10,6 +10,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 const utilisateurCourant = vi.hoisted(() => vi.fn());
 const recupererEtatInscription = vi.hoisted(() => vi.fn());
 const recupererCours = vi.hoisted(() => vi.fn());
+const recupererPipeline = vi.hoisted(() => vi.fn());
 const redirect = vi.hoisted(() =>
   vi.fn((cible: string) => {
     throw new Error(`REDIRECT:${cible}`);
@@ -22,6 +23,7 @@ vi.mock("@/lib/catalog", () => ({
   recupererCours,
   SLUG_FORMATION_PRINCIPALE: "flutter-firebase-debutants",
 }));
+vi.mock("@/lib/progress", () => ({ recupererPipeline }));
 vi.mock("next/navigation", () => ({
   redirect,
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -44,12 +46,18 @@ const ETUDIANTE = {
   created_at: "2026-01-01T00:00:00Z",
   last_activity_at: null,
 };
-const ADMIN = { ...ETUDIANTE, id: 1, email: "anis@example.com", is_staff: true };
+const ADMIN = {
+  ...ETUDIANTE,
+  id: 1,
+  email: "anis@example.com",
+  is_staff: true,
+};
 
 beforeEach(() => {
   utilisateurCourant.mockReset();
   recupererEtatInscription.mockReset().mockResolvedValue(null);
   recupererCours.mockReset().mockResolvedValue(null);
+  recupererPipeline.mockReset().mockResolvedValue(null);
   redirect.mockClear();
   vi.stubGlobal("fetch", vi.fn());
 });
@@ -64,29 +72,37 @@ describe("pages publiques d'authentification", () => {
     render(pageConnexion.default());
     expect(screen.getByRole("heading", { name: "Connecte-toi" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Se connecter" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Crée-en un" }).getAttribute("href")).toBe(
-      "/inscription",
-    );
+    expect(
+      screen.getByRole("link", { name: "Crée-en un" }).getAttribute("href"),
+    ).toBe("/inscription");
   });
 
   it("/inscription : formulaire à trois champs", () => {
     render(pageInscription.default());
-    expect(screen.getByRole("button", { name: "Créer mon compte" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Créer mon compte" }),
+    ).toBeTruthy();
     expect(screen.getByLabelText("Téléphone")).toBeTruthy();
   });
 
   it("/mot-de-passe-oublie : formulaire d'envoi du lien", () => {
     render(pageOublie.default());
-    expect(screen.getByRole("button", { name: "Envoyer le lien" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Envoyer le lien" }),
+    ).toBeTruthy();
   });
 
   it("/nouveau-mot-de-passe : sans token, message d'erreur et pas de formulaire", () => {
     render(pageNouveau.default());
-    expect(screen.getByRole("alert").textContent).toContain("Ce lien est incomplet");
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Ce lien est incomplet",
+    );
   });
 
   it("le layout d'auth encadre ses enfants dans un <main>", () => {
-    const { container } = render(layoutAuth.default({ children: <p>contenu</p> }));
+    const { container } = render(
+      layoutAuth.default({ children: <p>contenu</p> }),
+    );
     expect(container.querySelector("main")).toBeTruthy();
     expect(screen.getByText("contenu")).toBeTruthy();
   });
@@ -103,7 +119,7 @@ describe("pages publiques d'authentification", () => {
 describe("/app — espace étudiant", () => {
   it("rend l'email de la session et le bouton de déconnexion", async () => {
     utilisateurCourant.mockResolvedValue(ETUDIANTE);
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("heading", { name: "Ton parcours" })).toBeTruthy();
     expect(screen.getByText("etudiante@example.com")).toBeTruthy();
@@ -113,7 +129,9 @@ describe("/app — espace étudiant", () => {
 
   it("sans session : redirige vers /connexion en conservant la destination", async () => {
     utilisateurCourant.mockResolvedValue(null);
-    await expect(pageEtudiant.default()).rejects.toThrow("REDIRECT:/connexion?suite=/app");
+    await expect(
+      pageEtudiant.default({ searchParams: Promise.resolve({}) }),
+    ).rejects.toThrow("REDIRECT:/connexion?suite=/app");
     expect(redirect).toHaveBeenCalledWith("/connexion?suite=/app");
   });
 
@@ -128,13 +146,17 @@ describe("/admin — back-office", () => {
     utilisateurCourant.mockResolvedValue(ADMIN);
     render(await pageAdmin.default());
 
-    expect(screen.getByRole("heading", { name: "Administration" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Administration" }),
+    ).toBeTruthy();
     expect(redirect).not.toHaveBeenCalled();
   });
 
   it("sans session : redirige vers /connexion", async () => {
     utilisateurCourant.mockResolvedValue(null);
-    await expect(pageAdmin.default()).rejects.toThrow("REDIRECT:/connexion?suite=/admin");
+    await expect(pageAdmin.default()).rejects.toThrow(
+      "REDIRECT:/connexion?suite=/admin",
+    );
   });
 
   it("session valide mais non-staff : renvoyée vers /app, aucun contenu admin rendu", async () => {

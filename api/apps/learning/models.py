@@ -1,9 +1,12 @@
-"""Progression de lecture (amorce de l'étape 5).
+"""Progression de lecture et de module (CLAUDE.md §5).
 
-L'étape 4 a besoin de `watched_s` pour reprendre à la position exacte. Les états
-`NOT_STARTED` / `IN_PROGRESS` / `DONE` et la complétion de module arriveront
-à l'étape 5 : on pose déjà les colonnes pour ne pas migrer deux fois le même
-modèle.
+`Progress` porte l'état par chapitre — posé dès l'étape 4 pour `watched_s`, complété
+ici avec les transitions `IN_PROGRESS` → `DONE`. `ModuleCompletion` existe dès
+l'étape 5 pour correspondre au modèle de données de référence, mais son champ
+`exam_passed` reste `False` pour tout le monde tant que l'étape 6 n'a pas posé les
+QCM : il n'y a pas encore d'examen à réussir. Le déverrouillage du module suivant, à
+cette étape, se calcule donc à la volée à partir de `Progress` (tous les chapitres du
+module précédent à `DONE`), pas depuis cette table — voir `apps/learning/services.py`.
 """
 
 from __future__ import annotations
@@ -39,3 +42,30 @@ class Progress(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id} — chapitre {self.chapter_id} ({self.state})"
+
+
+class ModuleCompletion(models.Model):
+    """Réussite d'un module. Posée pour l'étape 6 (examens réels) : voir docstring du
+    module. `best_score` reste `None` tant qu'aucune tentative n'existe.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="module_completions"
+    )
+    module = models.ForeignKey(
+        "catalog.Module", on_delete=models.CASCADE, related_name="completions"
+    )
+    exam_passed = models.BooleanField(default=False)
+    best_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    passed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "module"], name="module_completion_unique_user_module"
+            )
+        ]
+
+    def __str__(self) -> str:
+        etat = "réussi" if self.exam_passed else "en cours"
+        return f"{self.user_id} — module {self.module_id} ({etat})"

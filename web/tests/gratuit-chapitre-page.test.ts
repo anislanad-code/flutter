@@ -2,14 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const recupererChapitreGratuit = vi.hoisted(() => vi.fn());
-const notFound = vi.hoisted(() => vi.fn(() => { throw new Error("NEXT_NOT_FOUND"); }));
+const notFound = vi.hoisted(() =>
+  vi.fn(() => {
+    throw new Error("NEXT_NOT_FOUND");
+  }),
+);
 
 vi.mock("@/lib/catalog", () => ({ recupererChapitreGratuit }));
 vi.mock("next/navigation", () => ({ notFound }));
 
-const { default: ChapitreGratuitPage, generateMetadata } = await import(
-  "@/app/gratuit/[chapitre]/page"
-);
+const { default: ChapitreGratuitPage, generateMetadata } =
+  await import("@/app/gratuit/[chapitre]/page");
 
 const CHAPITRE = {
   id: 1,
@@ -32,11 +35,16 @@ describe("Page /gratuit/[chapitre]", () => {
     recupererChapitreGratuit.mockResolvedValue(CHAPITRE);
 
     const html = renderToStaticMarkup(
-      await ChapitreGratuitPage({ params: Promise.resolve({ chapitre: "installer-flutter" }) }),
+      await ChapitreGratuitPage({
+        params: Promise.resolve({ chapitre: "installer-flutter" }),
+      }),
     );
 
     expect(html).toContain("Installer Flutter");
     expect(html).toContain('href="/inscription"');
+    // Pas de progression à suivre pour un visiteur anonyme (§5) : ni le bouton, ni un
+    // appel à l'endpoint de complétion authentifié.
+    expect(html).not.toContain("Marquer ce chapitre comme terminé");
   });
 
   it("appelle notFound() pour un chapitre payant ou inexistant", async () => {
@@ -65,6 +73,8 @@ describe("Page /gratuit/[chapitre]", () => {
     });
 
     expect(metadata.title).toContain("Installer Flutter");
-    expect(metadata.alternates).toEqual({ canonical: "/gratuit/installer-flutter" });
+    expect(metadata.alternates).toEqual({
+      canonical: "/gratuit/installer-flutter",
+    });
   });
 });

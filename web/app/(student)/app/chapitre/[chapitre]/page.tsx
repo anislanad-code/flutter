@@ -18,13 +18,12 @@ type Props = {
   params: Promise<{ chapitre: string }>;
 };
 
-/* Lecture d'un chapitre par un compte connecté.
-
-   Provisoire, et assumé comme tel : la progression, la navigation chapitre à chapitre
-   et le suivi de lecture arrivent à l'étape 5. Ce que cette page prouve dès
-   maintenant, c'est que le paywall tient de bout en bout — un compte `PENDING` qui
-   tape l'URL d'un chapitre payant tombe sur la même 404 qu'un chapitre inexistant,
-   parce que Django ne renvoie rien et que rien n'est reconstruit ici. */
+/* Lecture d'un chapitre par un compte connecté, avec suivi de progression (§5) : le
+   bouton « Marquer ce chapitre comme terminé » écrit l'état côté serveur, et ramène
+   au pipeline pour montrer le nœud passer à `terminé`. Le paywall tient toujours de
+   bout en bout — un compte `PENDING` qui tape l'URL d'un chapitre payant tombe sur la
+   même 404 qu'un chapitre inexistant, parce que Django ne renvoie rien et que rien
+   n'est reconstruit ici. */
 export default async function PageChapitreEtudiant({ params }: Props) {
   const utilisateur = await utilisateurCourant();
   const { chapitre: slug } = await params;
@@ -45,10 +44,12 @@ export default async function PageChapitreEtudiant({ params }: Props) {
         <h1 className="font-titre text-[length:var(--texte-3xl)] font-semibold text-ink">
           {chapitre.title}
         </h1>
-        <p className="text-[length:var(--texte-sm)] text-ink">{chapitre.module_title}</p>
+        <p className="text-[length:var(--texte-sm)] text-ink">
+          {chapitre.module_title}
+        </p>
       </header>
 
-      <LecteurChapitre chapitre={chapitre} />
+      <LecteurChapitre chapitre={chapitre} avecSuiviDeProgression />
     </main>
   );
 }

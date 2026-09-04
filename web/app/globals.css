@@ -45,6 +45,24 @@
   }
 }
 
+/* Le seul mouvement de l'app : le passage d'un nœud du pipeline à l'état « terminé »
+   (§6). Rien d'autre ne s'anime — pas de fondu au montage, pas de survol animé. */
+@keyframes noeud-termine {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.noeud-vient-de-terminer {
+  animation: noeud-termine 420ms ease-out;
+}
+
 /* Un seul moment de mouvement dans l'app, et il se coupe si l'utilisateur le demande. */
 @media (prefers-reduced-motion: reduce) {
   *,

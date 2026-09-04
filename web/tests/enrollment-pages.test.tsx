@@ -14,6 +14,7 @@ const recupererEtatInscription = vi.hoisted(() => vi.fn());
 const recupererInscriptionsAdmin = vi.hoisted(() => vi.fn());
 const recupererCours = vi.hoisted(() => vi.fn());
 const recupererChapitreAuthentifie = vi.hoisted(() => vi.fn());
+const recupererPipeline = vi.hoisted(() => vi.fn());
 const redirect = vi.hoisted(() =>
   vi.fn((cible: string) => {
     throw new Error(`REDIRECT:${cible}`);
@@ -26,12 +27,16 @@ const notFound = vi.hoisted(() =>
 );
 
 vi.mock("@/lib/current-user", () => ({ utilisateurCourant }));
-vi.mock("@/lib/enrollment", () => ({ recupererEtatInscription, recupererInscriptionsAdmin }));
+vi.mock("@/lib/enrollment", () => ({
+  recupererEtatInscription,
+  recupererInscriptionsAdmin,
+}));
 vi.mock("@/lib/catalog", () => ({
   recupererCours,
   recupererChapitreAuthentifie,
   SLUG_FORMATION_PRINCIPALE: "flutter-firebase-debutants",
 }));
+vi.mock("@/lib/progress", () => ({ recupererPipeline }));
 vi.mock("next/navigation", () => ({
   redirect,
   notFound,
@@ -40,7 +45,8 @@ vi.mock("next/navigation", () => ({
 
 const pageEtudiant = await import("@/app/(student)/app/page");
 const pageActivation = await import("@/app/(student)/app/activation/page");
-const pageChapitre = await import("@/app/(student)/app/chapitre/[chapitre]/page");
+const pageChapitre =
+  await import("@/app/(student)/app/chapitre/[chapitre]/page");
 const pageInscriptions = await import("@/app/(admin)/admin/inscriptions/page");
 
 const ETUDIANTE = {
@@ -51,7 +57,12 @@ const ETUDIANTE = {
   created_at: "2026-01-01T00:00:00Z",
   last_activity_at: null,
 };
-const ADMIN = { ...ETUDIANTE, id: 1, email: "anis@example.com", is_staff: true };
+const ADMIN = {
+  ...ETUDIANTE,
+  id: 1,
+  email: "anis@example.com",
+  is_staff: true,
+};
 
 const INSTRUCTIONS = {
   provider: "MANUAL_CCP",
@@ -84,8 +95,20 @@ const COURS = {
       title: "Mise en route",
       summary: "",
       chapters: [
-        { id: 1, slug: "installer-flutter", order: 1, title: "Installer Flutter", is_free: true },
-        { id: 2, slug: "premier-widget", order: 2, title: "Ton premier widget", is_free: false },
+        {
+          id: 1,
+          slug: "installer-flutter",
+          order: 1,
+          title: "Installer Flutter",
+          is_free: true,
+        },
+        {
+          id: 2,
+          slug: "premier-widget",
+          order: 2,
+          title: "Ton premier widget",
+          is_free: false,
+        },
       ],
     },
   ],
@@ -108,6 +131,7 @@ beforeEach(() => {
   recupererInscriptionsAdmin.mockReset().mockResolvedValue([]);
   recupererCours.mockReset().mockResolvedValue(COURS);
   recupererChapitreAuthentifie.mockReset().mockResolvedValue(null);
+  recupererPipeline.mockReset().mockResolvedValue(null);
   redirect.mockClear();
   notFound.mockClear();
 });
@@ -116,14 +140,16 @@ afterEach(cleanup);
 
 describe("/app — tableau de bord", () => {
   it("un compte en attente voit le parcours complet et l'invitation à payer", async () => {
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("heading", { name: "Ton parcours" })).toBeTruthy();
     expect(screen.getByText("Installer Flutter")).toBeTruthy();
     expect(screen.getByText(/Ton premier widget/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Envoyer le reçu" }).getAttribute("href")).toBe(
-      "/app/activation",
-    );
+    expect(
+      screen
+        .getByRole("link", { name: "Envoyer le reçu" })
+        .getAttribute("href"),
+    ).toBe("/app/activation");
     expect(screen.getByText(/verse au CCP/)).toBeTruthy();
   });
 
@@ -132,7 +158,7 @@ describe("/app — tableau de bord", () => {
       etat({ instructions: { ...INSTRUCTIONS, account_label: "BaridiMob" } }),
     );
 
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(/verse au BaridiMob/)).toBeTruthy();
     expect(screen.queryByText(/verse au CCP/)).toBeNull();
@@ -143,7 +169,7 @@ describe("/app — tableau de bord", () => {
       etat({ derniere_preuve: { status: "SUBMITTED", reject_reason: "" } }),
     );
 
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(/Réponse sous 24 h/)).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Envoyer le reçu" })).toBeNull();
@@ -152,29 +178,86 @@ describe("/app — tableau de bord", () => {
   it("un reçu refusé affiche le motif et propose de renvoyer", async () => {
     recupererEtatInscription.mockResolvedValue(
       etat({
-        derniere_preuve: { status: "REJECTED", reject_reason: "Le montant n'est pas lisible." },
+        derniere_preuve: {
+          status: "REJECTED",
+          reject_reason: "Le montant n'est pas lisible.",
+        },
       }),
     );
 
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(/Le montant n'est pas lisible/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Renvoyer un reçu" })).toBeTruthy();
   });
 
   it("un compte actif n'a plus de bannière de versement", async () => {
-    recupererEtatInscription.mockResolvedValue(etat({ status: "ACTIVE", depot_possible: false }));
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "ACTIVE", depot_possible: false }),
+    );
 
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.queryByRole("link", { name: "Envoyer le reçu" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Ton premier widget" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Ton premier widget" }),
+    ).toBeTruthy();
+  });
+
+  it("un compte actif avec pipeline calculé affiche le pipeline, pas le parcours simple", async () => {
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "ACTIVE", depot_possible: false }),
+    );
+    recupererPipeline.mockResolvedValue({
+      course_slug: "flutter-firebase-debutants",
+      resume_chapter_slug: "premier-widget",
+      modules: [
+        {
+          id: 1,
+          order: 0,
+          title: "Mise en route",
+          unlocked: true,
+          completed_chapters: 1,
+          total_chapters: 2,
+          chapters: [
+            {
+              id: 1,
+              slug: "installer-flutter",
+              order: 1,
+              title: "Installer Flutter",
+              is_free: true,
+              state: "termine",
+            },
+            {
+              id: 2,
+              slug: "premier-widget",
+              order: 2,
+              title: "Ton premier widget",
+              is_free: false,
+              state: "disponible",
+            },
+          ],
+        },
+      ],
+    });
+
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("link", { name: "Reprendre" })).toBeTruthy();
+    expect(recupererPipeline).toHaveBeenCalledWith(
+      "flutter-firebase-debutants",
+    );
+  });
+
+  it("un compte non actif n'appelle jamais /api/progress", async () => {
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
+    expect(recupererPipeline).not.toHaveBeenCalled();
   });
 
   it("catalogue injoignable : message honnête plutôt qu'une page cassée", async () => {
     recupererCours.mockResolvedValue(null);
 
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(/n'a pas pu être chargé/)).toBeTruthy();
   });
@@ -182,25 +265,31 @@ describe("/app — tableau de bord", () => {
   it("état d'inscription injoignable : le parcours reste visible, en attente", async () => {
     recupererEtatInscription.mockResolvedValue(null);
 
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("link", { name: "Envoyer le reçu" })).toBeTruthy();
     expect(screen.getByText("Installer Flutter")).toBeTruthy();
   });
 
   it("un compte expiré voit encore le chapitre gratuit, pas le payant", async () => {
-    recupererEtatInscription.mockResolvedValue(etat({ status: "EXPIRED", depot_possible: false }));
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "EXPIRED", depot_possible: false }),
+    );
 
-    render(await pageEtudiant.default());
+    render(await pageEtudiant.default({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("link", { name: "Envoyer le reçu" })).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Ton premier widget" })).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "Ton premier widget" }),
+    ).toBeNull();
   });
 
   it("sans session : redirige vers /connexion", async () => {
     utilisateurCourant.mockResolvedValue(null);
 
-    await expect(pageEtudiant.default()).rejects.toThrow("REDIRECT:/connexion?suite=/app");
+    await expect(
+      pageEtudiant.default({ searchParams: Promise.resolve({}) }),
+    ).rejects.toThrow("REDIRECT:/connexion?suite=/app");
   });
 });
 
@@ -209,29 +298,43 @@ describe("/app/activation", () => {
     render(await pageActivation.default());
 
     expect(screen.getByText("0012345678")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Envoyer le reçu" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Envoyer le reçu" }),
+    ).toBeTruthy();
   });
 
   it("un reçu déjà en examen remplace le formulaire par une attente", async () => {
     recupererEtatInscription.mockResolvedValue(
-      etat({ depot_possible: false, derniere_preuve: { status: "SUBMITTED", reject_reason: "" } }),
+      etat({
+        depot_possible: false,
+        derniere_preuve: { status: "SUBMITTED", reject_reason: "" },
+      }),
     );
 
     render(await pageActivation.default());
 
     expect(screen.getByRole("heading", { name: "Reçu envoyé" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Envoyer le reçu" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Envoyer le reçu" }),
+    ).toBeNull();
   });
 
   it("après un refus, le motif est rappelé au-dessus du formulaire", async () => {
     recupererEtatInscription.mockResolvedValue(
-      etat({ derniere_preuve: { status: "REJECTED", reject_reason: "Capture illisible." } }),
+      etat({
+        derniere_preuve: {
+          status: "REJECTED",
+          reject_reason: "Capture illisible.",
+        },
+      }),
     );
 
     render(await pageActivation.default());
 
     expect(screen.getByText("Capture illisible.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Envoyer le reçu" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Envoyer le reçu" }),
+    ).toBeTruthy();
   });
 
   it("un compte déjà actif est renvoyé à son parcours", async () => {
@@ -254,17 +357,25 @@ describe("/app/activation", () => {
     render(await pageActivation.default());
 
     expect(screen.getByText(/n'ont pas pu être chargées/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Envoyer le reçu" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Envoyer le reçu" }),
+    ).toBeNull();
   });
 
   it("un compte bloqué n'a plus de formulaire de reçu", async () => {
-    recupererEtatInscription.mockResolvedValue(etat({ status: "BLOCKED", depot_possible: false }));
+    recupererEtatInscription.mockResolvedValue(
+      etat({ status: "BLOCKED", depot_possible: false }),
+    );
 
     render(await pageActivation.default());
 
     expect(screen.getByText(/n'attend plus de reçu/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Envoyer le reçu" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Retourner au parcours" })).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Envoyer le reçu" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Retourner au parcours" }),
+    ).toBeTruthy();
   });
 });
 
@@ -283,13 +394,21 @@ describe("/app/chapitre/[chapitre]", () => {
 
     render(await pageChapitre.default({ params }));
 
-    expect(screen.getByRole("heading", { name: "Ton premier widget" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Ton premier widget" }),
+    ).toBeTruthy();
     expect(screen.getByText("Mise en route")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Marquer ce chapitre comme terminé" }),
+    ).toBeTruthy();
   });
 
   it("le titre de la page ne dévoile jamais le titre du chapitre", async () => {
     expect(pageChapitre.metadata.title).toBe("Chapitre — anis.dev");
-    expect(pageChapitre.metadata.robots).toEqual({ index: false, follow: false });
+    expect(pageChapitre.metadata.robots).toEqual({
+      index: false,
+      follow: false,
+    });
   });
 
   it("sans session : redirige en conservant la destination", async () => {
@@ -307,16 +426,18 @@ describe("/admin/inscriptions", () => {
   it("un compte non-admin est renvoyé vers son espace", async () => {
     utilisateurCourant.mockResolvedValue(ETUDIANTE);
 
-    await expect(pageInscriptions.default({ searchParams: sans })).rejects.toThrow("REDIRECT:/app");
+    await expect(
+      pageInscriptions.default({ searchParams: sans }),
+    ).rejects.toThrow("REDIRECT:/app");
     expect(recupererInscriptionsAdmin).not.toHaveBeenCalled();
   });
 
   it("sans session : redirige vers /connexion", async () => {
     utilisateurCourant.mockResolvedValue(null);
 
-    await expect(pageInscriptions.default({ searchParams: sans })).rejects.toThrow(
-      "REDIRECT:/connexion?suite=/admin/inscriptions",
-    );
+    await expect(
+      pageInscriptions.default({ searchParams: sans }),
+    ).rejects.toThrow("REDIRECT:/connexion?suite=/admin/inscriptions");
   });
 
   it("l'admin voit la file, filtrée sur les demandes en attente par défaut", async () => {
@@ -344,21 +465,28 @@ describe("/admin/inscriptions", () => {
     utilisateurCourant.mockResolvedValue(ADMIN);
 
     render(
-      await pageInscriptions.default({ searchParams: Promise.resolve({ statut: "TOUS" }) }),
+      await pageInscriptions.default({
+        searchParams: Promise.resolve({ statut: "TOUS" }),
+      }),
     );
 
     expect(recupererInscriptionsAdmin).toHaveBeenCalledWith(undefined);
   });
 
   it("les deux pages d'administration refusent l'indexation", () => {
-    expect(pageInscriptions.metadata.robots).toEqual({ index: false, follow: false });
+    expect(pageInscriptions.metadata.robots).toEqual({
+      index: false,
+      follow: false,
+    });
   });
 
   it("le filtre Actives est relayé tel quel", async () => {
     utilisateurCourant.mockResolvedValue(ADMIN);
 
     render(
-      await pageInscriptions.default({ searchParams: Promise.resolve({ statut: "ACTIVE" }) }),
+      await pageInscriptions.default({
+        searchParams: Promise.resolve({ statut: "ACTIVE" }),
+      }),
     );
 
     expect(recupererInscriptionsAdmin).toHaveBeenCalledWith("ACTIVE");
