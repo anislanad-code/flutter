@@ -176,6 +176,23 @@ describe("Qcm — QCM de chapitre", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/utilisé toutes tes tentatives/);
   });
 
+  it("un quiz sans question affiche un message plutôt qu'un écran vide", async () => {
+    const utilisateur = userEvent.setup();
+    render(
+      <Qcm
+        quiz={{ ...QUIZ_CHAPITRE, questions: [] }}
+        retourHref="/app/chapitre/x"
+        retourLibelle="Retour"
+      />,
+    );
+    await utilisateur.click(screen.getByRole("button", { name: "Commencer" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toMatch(/n'a pas encore de question/),
+    );
+    expect(screen.getByRole("link", { name: "Retour" })).toBeTruthy();
+  });
+
   it("session expirée au démarrage : message explicite, pas de question affichée", async () => {
     brancherFetch({ demarrage: reponseJson({ detail: "Non authentifié." }, 401) });
     const utilisateur = userEvent.setup();

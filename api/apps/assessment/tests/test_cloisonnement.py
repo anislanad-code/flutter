@@ -93,13 +93,15 @@ def test_le_quiz_dune_formation_depubliee_nest_pas_servi(
     inscription_active: Enrollment,
     quiz_chapitre: Quiz,
     quiz_chapitre_payant: Quiz,
+    quiz_examen: Quiz,
     cours: Course,
 ) -> None:
     """Invariante posée à l'étape 2 et rejouée à l'étape 5 : une formation dépubliée
     n'expose plus rien — ni sa structure, ni un chapitre, ni sa progression, ni un
     jeton de lecture (`catalog/views.py:63,93`, `learning/views.py:51,81`,
     `media/services.py:77`). Le QCM est du contenu de formation comme le reste :
-    `a_acces_au_quiz` doit refuser un quiz dont la formation n'est pas publiée."""
+    `a_acces_au_quiz` doit refuser un quiz dont la formation n'est pas publiée, sur les
+    deux branches — QCM de chapitre **et** examen de module."""
     cours.is_published = False
     cours.save(update_fields=["is_published"])
 
@@ -112,6 +114,10 @@ def test_le_quiz_dune_formation_depubliee_nest_pas_servi(
         ).status_code,
         "GET quiz du chapitre payant": client_etudiante.get(
             f"/api/quizzes/{quiz_chapitre_payant.id}"
+        ).status_code,
+        "GET examen de module": client_etudiante.get(f"/api/quizzes/{quiz_examen.id}").status_code,
+        "POST tentative d'examen": client_etudiante.post(
+            f"/api/quizzes/{quiz_examen.id}/attempts"
         ).status_code,
     }
 

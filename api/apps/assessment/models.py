@@ -83,6 +83,19 @@ class Choice(models.Model):
 
     class Meta:
         ordering = ["order"]
+        constraints = [
+            # Au plus une bonne réponse par question, défendu en base (comme
+            # `quiz_xor_chapitre_module`) : une deuxième coche `is_correct` sur la même
+            # question ne doit pas pouvoir être enregistrée en silence. Le minimum —
+            # *au moins* une bonne réponse — est imposé à la saisie par l'admin
+            # (`ChoiceInlineFormSet`, dans `admin.py`) : une contrainte de base ne peut
+            # pas exprimer « il existe au moins une ligne enfant ».
+            models.UniqueConstraint(
+                fields=["question"],
+                condition=models.Q(is_correct=True),
+                name="choice_une_seule_bonne_reponse_par_question",
+            )
+        ]
 
     def __str__(self) -> str:
         return self.text
@@ -107,6 +120,18 @@ class Attempt(models.Model):
     class Meta:
         ordering = ["-started_at"]
         indexes = [models.Index(fields=["user", "quiz"])]
+        constraints = [
+            # Au plus une tentative ouverte (non soumise) par (user, quiz), défendu en
+            # base : `demarrer_tentative` s'appuie dessus (`except IntegrityError`) pour
+            # rester correct sous deux requêtes concurrentes (double clic, deux onglets),
+            # ce qu'un `SELECT ... FOR UPDATE` sur un ensemble vide ne peut pas garantir
+            # à lui seul.
+            models.UniqueConstraint(
+                fields=["user", "quiz"],
+                condition=models.Q(submitted_at__isnull=True),
+                name="attempt_une_seule_ouverte_par_utilisateur_quiz",
+            )
+        ]
 
     def __str__(self) -> str:
         etat = self.score if self.score is not None else "en cours"

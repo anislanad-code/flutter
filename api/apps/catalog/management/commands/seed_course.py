@@ -13,6 +13,7 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from apps.assessment.models import Choice, Question, Quiz
 from apps.catalog.models import Chapter, Course, Lesson, Module
 
 TRANSCRIPT_CHAPITRE_1 = """\
@@ -74,6 +75,22 @@ RESSOURCES_CHAPITRE_1: list[dict[str, str]] = [
 ]
 
 
+def _semer_qcm(*, quiz: Quiz, questions: list[tuple[str, str, list[tuple[str, bool]]]]) -> None:
+    """`questions` : liste de `(texte, explication, [(texte_choix, est_correct), ...])`,
+    une seule bonne réponse par question (§7 — imposé aussi en base, voir
+    `choice_une_seule_bonne_reponse_par_question`)."""
+    for ordre, (texte, explication, choix) in enumerate(questions, start=1):
+        question, _ = Question.objects.update_or_create(
+            quiz=quiz, order=ordre, defaults={"text": texte, "explanation": explication}
+        )
+        for ordre_choix, (texte_choix, correct) in enumerate(choix, start=1):
+            Choice.objects.update_or_create(
+                question=question,
+                order=ordre_choix,
+                defaults={"text": texte_choix, "is_correct": correct},
+            )
+
+
 class Command(BaseCommand):
     help = "Sème la formation Flutter + Firebase pour débutants absolus."
 
@@ -122,6 +139,46 @@ class Command(BaseCommand):
                 "resources": RESSOURCES_CHAPITRE_1,
             },
         )
+        quiz_chapitre_1, _ = Quiz.objects.update_or_create(
+            chapter=chapitre_1,
+            defaults={"pass_threshold": 60, "max_attempts": 3, "min_duration_s": 20},
+        )
+        _semer_qcm(
+            quiz=quiz_chapitre_1,
+            questions=[
+                (
+                    "Que vérifie la commande `flutter doctor` ?",
+                    "`flutter doctor` liste ce qui manque à l'installation — SDK Android, "
+                    "licences à accepter, éditeur non détecté.",
+                    [
+                        (
+                            "Que l'installation de Flutter est complète et bien configurée",
+                            True,
+                        ),
+                        ("Que l'application compile sans erreur", False),
+                    ],
+                ),
+                (
+                    "Quel éditeur le chapitre recommande-t-il pour commencer ?",
+                    "VS Code avec l'extension officielle Flutter, qui installe aussi "
+                    "l'extension Dart.",
+                    [
+                        ("VS Code avec l'extension Flutter", True),
+                        ("Un éditeur de texte sans extension particulière", False),
+                    ],
+                ),
+                (
+                    "Que confirme l'apparition d'un compteur et d'un bouton « + » après "
+                    "`flutter run` ?",
+                    "C'est le signe que l'installation fonctionne de bout en bout — SDK, "
+                    "éditeur et émulateur.",
+                    [
+                        ("Que l'installation est correcte", True),
+                        ("Qu'il faut réinstaller le SDK", False),
+                    ],
+                ),
+            ],
+        )
 
         chapitre_2, _ = Chapter.objects.update_or_create(
             module=module_0,
@@ -144,6 +201,46 @@ class Command(BaseCommand):
             },
         )
         Lesson.objects.get_or_create(chapter=chapitre_3, defaults={"duration_s": 420})
+
+        examen_module_0, _ = Quiz.objects.update_or_create(
+            module=module_0,
+            defaults={"pass_threshold": 60, "max_attempts": 3, "min_duration_s": 20},
+        )
+        _semer_qcm(
+            quiz=examen_module_0,
+            questions=[
+                (
+                    "Qu'est-ce qu'un widget en Flutter ?",
+                    "En Flutter, tout élément d'interface — texte, bouton, mise en page — "
+                    "est un widget.",
+                    [
+                        ("Un composant qui décrit une partie de l'interface", True),
+                        ("Un fichier de configuration du projet", False),
+                    ],
+                ),
+                (
+                    "À quoi sert le Hot Reload ?",
+                    "Le Hot Reload recharge le code modifié dans l'application déjà "
+                    "lancée, sans redémarrer l'émulateur ni perdre l'état de navigation.",
+                    [
+                        (
+                            "Voir les changements de code presque instantanément, sans "
+                            "relancer l'app",
+                            True,
+                        ),
+                        ("Publier l'application sur le store", False),
+                    ],
+                ),
+                (
+                    "Quelle commande vérifie que l'installation de Flutter est correcte ?",
+                    "`flutter doctor` est l'outil de diagnostic officiel de l'installation.",
+                    [
+                        ("flutter doctor", True),
+                        ("flutter publish", False),
+                    ],
+                ),
+            ],
+        )
 
         module_1, _ = Module.objects.update_or_create(
             course=course,

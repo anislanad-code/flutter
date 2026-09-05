@@ -10,13 +10,41 @@ from __future__ import annotations
 from typing import Any
 
 from django.contrib import admin
+from django.core.exceptions import ValidationError
+from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 
 from apps.assessment.models import Attempt, Choice, Question, Quiz
 
 
+class ChoiceInlineFormSet(BaseInlineFormSet):  # type: ignore[type-arg]
+    """Exactement une bonne réponse par question — imposé à la saisie (§1 : l'admin est
+    le seul outil d'édition de contenu). Le pendant base de données, « au plus une »,
+    est défendu par `choice_une_seule_bonne_reponse_par_question` (`models.py`) ; « au
+    moins une » ne peut se poser qu'ici, une contrainte ne pouvant pas exprimer
+    « il existe au moins une ligne enfant ».
+    """
+
+    def clean(self) -> None:
+        super().clean()
+        if any(self.errors):
+            return
+        formulaires_actifs = [
+            f for f in self.forms if f.cleaned_data and not f.cleaned_data.get("DELETE", False)
+        ]
+        if not formulaires_actifs:
+            return
+        correctes = sum(1 for f in formulaires_actifs if f.cleaned_data.get("is_correct"))
+        if correctes != 1:
+            raise ValidationError(
+                "Cette question doit avoir exactement une bonne réponse "
+                f"(actuellement {correctes})."
+            )
+
+
 class ChoiceInline(admin.TabularInline):  # type: ignore[type-arg]
     model = Choice
+    formset = ChoiceInlineFormSet
     extra = 1
     fields = ["order", "text", "is_correct"]
 

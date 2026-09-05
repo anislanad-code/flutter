@@ -177,6 +177,44 @@ def test_un_module_sans_examen_deverrouille_le_suivant_comme_avant(
     assert _module(pipeline, 1)["unlocked"] is True
 
 
+def test_un_examen_encore_vide_ne_verrouille_pas_le_reste_du_parcours(
+    client_etudiante: APIClient,
+    inscription_active: Enrollment,
+    etudiante: User,
+    chapitre_0a: Chapter,
+    chapitre_0b: Chapter,
+    chapitre_1a: Chapter,
+    module_0: Module,
+    cours: Any,
+) -> None:
+    """Correctif du MAJEUR 2 de `etape-06-code-reviewer.md` (ex-test de caractérisation
+    du même nom, sans « ne pas »). Un `Quiz` de module créé dans l'admin mais pas encore
+    rempli de questions — l'état normal entre la création et la saisie du contenu — est
+    désormais traité comme un examen *absent* par `calculer_pipeline` (`quiz_par_module`
+    filtre sur `nb_questions__gt=0`) : il ne verrouille rien, exactement comme un module
+    sans chapitre ne le fait pas (étape 5)."""
+    examen_vide = Quiz.objects.create(module=module_0, pass_threshold=60, min_duration_s=0)
+    _terminer(etudiante, chapitre_0a)
+    _terminer(etudiante, chapitre_0b)
+    tentative = Attempt.objects.create(
+        user=etudiante, quiz=examen_vide, started_at=timezone.now() - dt.timedelta(hours=1)
+    )
+
+    reponse = client_etudiante.post(
+        f"/api/attempts/{tentative.id}/submit", {"answers": {}}, format="json"
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["score"] == 0
+    assert reponse.json()["passed"] is False
+    pipeline = client_etudiante.get("/api/progress", {"course": cours.slug}).json()
+    # L'examen vide n'apparaît pas dans le pipeline (traité comme absent) — c'est
+    # `exam_passed` du module *courant*, pas celui de l'examen vide qu'on vient de
+    # soumettre en vain, que `calculer_pipeline` ignore.
+    assert _module(pipeline, 0)["exam_quiz_id"] is None
+    assert _module(pipeline, 1)["unlocked"] is True
+
+
 def test_le_pipeline_expose_lid_du_qcm_de_chaque_chapitre_et_de_lexamen(
     client_etudiante: APIClient,
     inscription_active: Enrollment,
@@ -186,6 +224,9 @@ def test_le_pipeline_expose_lid_du_qcm_de_chaque_chapitre_et_de_lexamen(
     cours: Any,
 ) -> None:
     quiz_chapitre = Quiz.objects.create(chapter=chapitre_0a, min_duration_s=0)
+    question = Question.objects.create(quiz=quiz_chapitre, order=1, text="Une question ?")
+    Choice.objects.create(question=question, order=1, text="Bonne", is_correct=True)
+    Choice.objects.create(question=question, order=2, text="Mauvaise", is_correct=False)
     examen = _examen(module_0)
 
     pipeline = client_etudiante.get("/api/progress", {"course": cours.slug}).json()

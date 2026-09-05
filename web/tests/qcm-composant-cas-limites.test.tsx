@@ -201,7 +201,7 @@ describe("Qcm — chemins d'erreur de la soumission", () => {
         json: async () => {
           throw new Error("corps illisible");
         },
-      } as Response,
+      } as unknown as Response,
     });
     const utilisateur = userEvent.setup();
     render(<Qcm quiz={QUIZ_CHAPITRE} retourHref="/app" retourLibelle="Retour" />);
@@ -285,7 +285,10 @@ describe("Qcm — chemins d'erreur de la soumission", () => {
 describe("Qcm — écran de résultat", () => {
   beforeEach(() => brancherFetch({}));
 
-  it("un échec affiche le seuil requis et la bonne réponse de chaque question ratée", async () => {
+  it("un échec avec tentative restante affiche le seuil requis, mais pas encore la bonne réponse", async () => {
+    /* Corriger complètement puis proposer « Recommencer » rendrait la tentative
+       suivante triviale — la révélation complète n'arrive qu'à la dernière tentative
+       ou à la réussite (MAJEUR 4 de la relecture d'étape 6). */
     const utilisateur = userEvent.setup();
     render(<Qcm quiz={QUIZ_CHAPITRE} retourHref="/app" retourLibelle="Retour" />);
 
@@ -298,7 +301,36 @@ describe("Qcm — écran de résultat", () => {
       ).toBeTruthy(),
     );
     expect(screen.getByText("Bonne réponse.")).toBeTruthy();
-    expect(screen.getByText("Bonne réponse : Non")).toBeTruthy();
+    expect(screen.getByText("Réponse incorrecte.")).toBeTruthy();
+    expect(screen.queryByText("Bonne réponse : Non")).toBeNull();
+    expect(screen.queryByText("`flutter doctor` vérifie l'environnement.")).toBeNull();
+  });
+
+  it("un échec à la dernière tentative révèle la bonne réponse et l'explication", async () => {
+    brancherFetch({
+      soumission: reponseJson({ ...RESULTAT_ECHOUE, attempts_remaining: 0 }),
+    });
+    const utilisateur = userEvent.setup();
+    render(<Qcm quiz={QUIZ_CHAPITRE} retourHref="/app" retourLibelle="Retour" />);
+
+    await repondreAuxDeuxQuestions(utilisateur);
+    await utilisateur.click(screen.getByRole("button", { name: "Envoyer" }));
+
+    await waitFor(() => screen.getByText("Bonne réponse : Non"));
+    expect(screen.getByText("`flutter doctor` vérifie l'environnement.")).toBeTruthy();
+  });
+
+  it("un examen réussi révèle la correction même s'il reste des tentatives", async () => {
+    brancherFetch({
+      soumission: reponseJson({ ...RESULTAT_ECHOUE, passed: true, attempts_remaining: 2 }),
+    });
+    const utilisateur = userEvent.setup();
+    render(<Qcm quiz={QUIZ_CHAPITRE} retourHref="/app" retourLibelle="Retour" />);
+
+    await repondreAuxDeuxQuestions(utilisateur);
+    await utilisateur.click(screen.getByRole("button", { name: "Envoyer" }));
+
+    await waitFor(() => screen.getByText("Bonne réponse : Non"));
   });
 
   it("une question sans explication n'affiche pas de paragraphe vide", async () => {
@@ -369,6 +401,7 @@ describe("Qcm — écran de résultat", () => {
     brancherFetch({
       soumission: reponseJson({
         ...RESULTAT_ECHOUE,
+        attempts_remaining: 0,
         questions: [
           {
             ...RESULTAT_ECHOUE.questions[0]!,
@@ -397,6 +430,7 @@ describe("Qcm — écran de résultat", () => {
     brancherFetch({
       soumission: reponseJson({
         ...RESULTAT_ECHOUE,
+        attempts_remaining: 0,
         questions: [
           { ...RESULTAT_ECHOUE.questions[0]!, explanation: charge },
           RESULTAT_ECHOUE.questions[1]!,

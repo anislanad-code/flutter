@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.db import IntegrityError, transaction
+from django.db.models import Count
 from django.utils import timezone
 
 from apps.accounts.models import User
@@ -167,11 +168,23 @@ def calculer_pipeline(*, user: User, course: Course) -> EtatPipeline:
         (p.chapter_id): p.state
         for p in Progress.objects.filter(user=user, chapter__module__course=course)
     }
+    # `nb_questions__gt=0` : un quiz créé dans l'admin mais encore vide de questions
+    # n'est pas encore un quiz *jouable* — l'ignorer ici évite qu'un examen de module
+    # vide (score toujours à 0, donc jamais réussi) ne verrouille définitivement la
+    # suite du parcours, exactement comme un module sans chapitre ne le fait pas (§7,
+    # même classe de bug que le MAJEUR 9 de l'étape 5, ici pour l'examen plutôt que
+    # pour le chapitre).
     quiz_par_chapitre = dict(
-        Quiz.objects.filter(chapter__module__course=course).values_list("chapter_id", "id")
+        Quiz.objects.filter(chapter__module__course=course)
+        .annotate(nb_questions=Count("questions"))
+        .filter(nb_questions__gt=0)
+        .values_list("chapter_id", "id")
     )
     quiz_par_module = dict(
-        Quiz.objects.filter(module__course=course).values_list("module_id", "id")
+        Quiz.objects.filter(module__course=course)
+        .annotate(nb_questions=Count("questions"))
+        .filter(nb_questions__gt=0)
+        .values_list("module_id", "id")
     )
     examens_reussis = {
         mc.module_id

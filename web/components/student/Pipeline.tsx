@@ -89,7 +89,11 @@ export function Pipeline({ pipeline, chapitreVientDeTerminer }: Props) {
               ) : null}
 
               {mod.exam_quiz_id !== null ? (
-                <p className="mt-2 text-[length:var(--texte-sm)]">
+                <p
+                  className={`mt-2 text-[length:var(--texte-sm)] ${
+                    !mod.unlocked ? "opacity-45" : ""
+                  }`}
+                >
                   {mod.exam_passed ? (
                     <span className="text-zellige">Examen du module réussi.</span>
                   ) : (

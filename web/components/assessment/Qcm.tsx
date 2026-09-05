@@ -8,7 +8,9 @@ import { resultatTentativeSchema, tentativeDemarreeSchema } from "@/lib/assessme
 
 type Props = {
   quiz: EtatQuiz;
-  /** Vers le chapitre pour un QCM, vers le parcours pour un examen. */
+  /** Aujourd'hui toujours `/app` (le pipeline) : `EtatQuiz` ne transporte ni le slug
+   *  du chapitre ni celui du module, donc un retour direct vers la leçon n'est pas
+   *  encore possible sans une deuxième requête. Documenté ici plutôt que promis. */
   retourHref: string;
   retourLibelle: string;
 };
@@ -29,6 +31,12 @@ type Etape =
 
 const MESSAGE_GENERIQUE = "Quelque chose a échoué. Réessaie dans un instant.";
 
+function detailDuCorps(corps: unknown): string | null {
+  return typeof corps === "object" && corps !== null && "detail" in corps
+    ? String((corps as { detail: unknown }).detail)
+    : null;
+}
+
 /* Un QCM de chapitre (§6 : une question à la fois, pas de compte à rebours anxiogène)
    et un examen de module (récapitulatif avant envoi, format plus formel) partagent le
    même composant — seul `quiz.kind` change le déroulé, pas le code qui pose les
@@ -36,6 +44,10 @@ const MESSAGE_GENERIQUE = "Quelque chose a échoué. Réessaie dans un instant."
 export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
   const [etape, setEtape] = useState<Etape>({ phase: "intro" });
   const [attemptsRestantes, setAttemptsRestantes] = useState(quiz.attempts_remaining);
+  // Erreur d'un envoi qui n'a rien détruit (rythme trop rapide, limite de débit) :
+  // affichée à côté du bouton d'envoi, jamais en remplaçant l'écran — les réponses
+  // saisies restent là, prêtes à être renvoyées (§6, MAJEUR 5 de la relecture d'étape).
+  const [erreurEnvoi, setErreurEnvoi] = useState<string | null>(null);
 
   async function demarrer(): Promise<void> {
     setEtape({ phase: "demarrage" });
@@ -70,16 +82,23 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
     }
   }
 
-  async function envoyer(attemptId: number, reponses: Record<number, number>): Promise<void> {
+  async function envoyer(
+    attemptId: number,
+    reponses: Record<number, number>,
+    origine: "question" | "recap",
+  ): Promise<void> {
+    const revenir = (): Etape =>
+      origine === "recap"
+        ? { phase: "recap", attemptId, reponses }
+        : { phase: "question", attemptId, index: quiz.questions.length - 1, reponses };
+
+    setErreurEnvoi(null);
     setEtape({ phase: "envoi" });
     try {
-      const answers = Object.fromEntries(
-        Object.entries(reponses).map(([questionId, choiceId]) => [questionId, choiceId]),
-      );
       const reponse = await fetch(`/api/attempts/${attemptId}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers: reponses }),
       });
       if (reponse.status === 401) {
         setEtape({
@@ -88,13 +107,16 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
         });
         return;
       }
-      if (reponse.status === 400) {
+      if (reponse.status === 400 || reponse.status === 429) {
+        // Récupérable par nature (rythme trop rapide, débit) : l'étudiant n'a rien à
+        // corriger dans ses réponses, seulement à réessayer — elles restent donc là.
         const corps: unknown = await reponse.json().catch(() => null);
-        const detail =
-          typeof corps === "object" && corps !== null && "detail" in corps
-            ? String((corps as { detail: unknown }).detail)
-            : "Réponds un peu plus lentement avant d'envoyer.";
-        setEtape({ phase: "erreur", message: detail });
+        const message =
+          reponse.status === 429
+            ? "Trop de tentatives. Réessaie dans un instant."
+            : (detailDuCorps(corps) ?? "Réponds un peu plus lentement avant d'envoyer.");
+        setErreurEnvoi(message);
+        setEtape(revenir());
         return;
       }
       if (!reponse.ok) {
@@ -109,7 +131,8 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
       setAttemptsRestantes(parsed.data.attempts_remaining);
       setEtape({ phase: "resultat", resultat: parsed.data });
     } catch {
-      setEtape({ phase: "erreur", message: MESSAGE_GENERIQUE });
+      setErreurEnvoi(MESSAGE_GENERIQUE);
+      setEtape(revenir());
     }
   }
 
@@ -176,9 +199,19 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
 
   if (etape.phase === "resultat") {
     const { resultat } = etape;
+    // Corriger *complètement* un échec puis proposer « Recommencer » rendrait la
+    // tentative suivante triviale (la bonne réponse vient d'être donnée) — la
+    // correction intégrale n'apparaît donc qu'à la réussite ou quand il ne reste plus
+    // de tentative ; entre les deux, seul « correct / incorrect » est dit (MAJEUR 4 de
+    // la relecture d'étape : le plafond de tentatives doit rester un vrai plafond).
+    const reveleTout = resultat.passed || resultat.attempts_remaining <= 0;
     return (
       <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-2 border-l-2 border-safran bg-paper py-1 pl-5">
+        <div
+          className={`flex flex-col gap-2 border-l-2 bg-paper py-1 pl-5 ${
+            resultat.passed ? "border-zellige" : "border-danger"
+          }`}
+        >
           <h2 className="font-titre text-[length:var(--texte-xl)] font-semibold text-ink">
             {resultat.passed
               ? "Réussi"
@@ -187,6 +220,11 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
           <p className="text-[length:var(--texte-base)] text-ink">
             Score : {resultat.score} %.
           </p>
+          {!reveleTout ? (
+            <p className="text-[length:var(--texte-sm)] text-muted">
+              La correction détaillée s&apos;affiche à ta dernière tentative.
+            </p>
+          ) : null}
         </div>
 
         <ol className="flex flex-col gap-6">
@@ -203,9 +241,11 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
                 >
                   {aReussi
                     ? "Bonne réponse."
-                    : `Bonne réponse : ${choixCorrect?.text ?? "—"}`}
+                    : reveleTout
+                      ? `Bonne réponse : ${choixCorrect?.text ?? "—"}`
+                      : "Réponse incorrecte."}
                 </p>
-                {question.explanation ? (
+                {reveleTout && question.explanation ? (
                   <p className="max-w-mesure text-[length:var(--texte-sm)] text-muted">
                     {question.explanation}
                   </p>
@@ -259,7 +299,10 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setEtape({ phase: "question", attemptId, index, reponses })}
+                  onClick={() => {
+                    setErreurEnvoi(null);
+                    setEtape({ phase: "question", attemptId, index, reponses });
+                  }}
                   className="text-[length:var(--texte-xs)] text-zellige underline underline-offset-4"
                 >
                   Modifier
@@ -268,9 +311,14 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
             );
           })}
         </ol>
+        {erreurEnvoi ? (
+          <p role="alert" className="text-[length:var(--texte-sm)] text-danger">
+            {erreurEnvoi}
+          </p>
+        ) : null}
         <button
           type="button"
-          onClick={() => void envoyer(attemptId, reponses)}
+          onClick={() => void envoyer(attemptId, reponses, "recap")}
           className="min-h-11 self-start rounded bg-zellige px-4 py-2.5 text-[length:var(--texte-base)] font-medium text-paper transition-opacity hover:opacity-90"
         >
           Envoyer mes réponses
@@ -282,13 +330,27 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
   // phase === "question"
   const { attemptId, index, reponses } = etape;
   const question = quiz.questions[index];
-  if (!question) return null;
+  if (!question) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p role="alert" className="text-[length:var(--texte-base)] text-danger">
+          Ce QCM n&apos;a pas encore de question.
+        </p>
+        <Link
+          href={retourHref}
+          className="self-start text-[length:var(--texte-sm)] text-zellige underline underline-offset-4"
+        >
+          {retourLibelle}
+        </Link>
+      </div>
+    );
+  }
   const derniere = index === quiz.questions.length - 1;
   const reponseChoisie = reponses[question.id];
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-[length:var(--texte-xs)] text-muted">
+      <p className="text-[length:var(--texte-xs)] text-muted" aria-live="polite">
         Question {index + 1}/{quiz.questions.length}
       </p>
       <fieldset className="flex flex-col gap-4">
@@ -306,14 +368,15 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
                 name={`question-${question.id}`}
                 value={choix.id}
                 checked={reponseChoisie === choix.id}
-                onChange={() =>
+                onChange={() => {
+                  setErreurEnvoi(null);
                   setEtape({
                     phase: "question",
                     attemptId,
                     index,
                     reponses: { ...reponses, [question.id]: choix.id },
-                  })
-                }
+                  });
+                }}
                 className="h-4 w-4 accent-zellige"
               />
               <span className="text-[length:var(--texte-base)] text-ink">{choix.text}</span>
@@ -322,11 +385,20 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
         </div>
       </fieldset>
 
+      {erreurEnvoi && derniere ? (
+        <p role="alert" className="text-[length:var(--texte-sm)] text-danger">
+          {erreurEnvoi}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap gap-3">
         {index > 0 ? (
           <button
             type="button"
-            onClick={() => setEtape({ phase: "question", attemptId, index: index - 1, reponses })}
+            onClick={() => {
+              setErreurEnvoi(null);
+              setEtape({ phase: "question", attemptId, index: index - 1, reponses });
+            }}
             className="min-h-11 rounded border border-ink px-4 py-2.5 text-[length:var(--texte-base)] text-ink"
           >
             Précédent
@@ -340,9 +412,10 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
               if (quiz.kind === "examen") {
                 setEtape({ phase: "recap", attemptId, reponses });
               } else {
-                void envoyer(attemptId, reponses);
+                void envoyer(attemptId, reponses, "question");
               }
             }}
+            aria-describedby={reponseChoisie === undefined ? "qcm-choisis-une-reponse" : undefined}
             className="min-h-11 rounded bg-zellige px-4 py-2.5 text-[length:var(--texte-base)] font-medium text-paper transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {quiz.kind === "examen" ? "Vérifier avant d'envoyer" : "Envoyer"}
@@ -354,12 +427,18 @@ export function Qcm({ quiz, retourHref, retourLibelle }: Props) {
             onClick={() =>
               setEtape({ phase: "question", attemptId, index: index + 1, reponses })
             }
+            aria-describedby={reponseChoisie === undefined ? "qcm-choisis-une-reponse" : undefined}
             className="min-h-11 rounded bg-zellige px-4 py-2.5 text-[length:var(--texte-base)] font-medium text-paper transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             Suivant
           </button>
         )}
       </div>
+      {reponseChoisie === undefined ? (
+        <p id="qcm-choisis-une-reponse" className="text-[length:var(--texte-xs)] text-muted">
+          Choisis une réponse pour continuer.
+        </p>
+      ) : null}
     </div>
   );
 }

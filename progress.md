@@ -366,7 +366,7 @@ Terminer trois chapitres d'affilée et voir le pipeline se remplir. Cliquer sur 
 
 ---
 
-## Étape 6 — QCM de chapitre et examens de module
+## Étape 6 — QCM de chapitre et examens de module  `[x]` 2026-09-05
 
 **Objectif.** Un QCM court à la fin de chaque chapitre, un examen à la fin de chaque module, corrigés intégralement côté serveur.
 
@@ -387,13 +387,77 @@ Terminer trois chapitres d'affilée et voir le pipeline se remplir. Cliquer sur 
 Passer un QCM de chapitre, échouer, recommencer, réussir. Puis passer l'examen du module 0 et voir le module 1 passer de `recommandé plus tard` à `disponible` dans le pipeline. Inspecter la réponse de `GET /api/quizzes/{id}` : aucun champ ne révèle la bonne réponse.
 
 **Terminé quand**
-- [ ] `is_correct` n'apparaît dans **aucune** réponse d'API avant soumission
-- [ ] Une soumission plus rapide que la durée plancher est rejetée
-- [ ] La limite de tentatives est appliquée côté serveur
-- [ ] Un étudiant ne peut pas soumettre une tentative appartenant à un autre
-- [ ] Le score ne peut pas être envoyé ni influencé depuis le client
+- [x] `is_correct` n'apparaît dans **aucune** réponse d'API avant soumission — *2026-09-05, vérifié par test (`test_quiz_ne_revele_jamais_is_correct`) et par exploitation curl (security-tester)*
+- [x] Une soumission plus rapide que la durée plancher est rejetée — *2026-09-05*
+- [x] La limite de tentatives est appliquée côté serveur, y compris sous deux requêtes concurrentes (contrainte `attempt_une_seule_ouverte_par_utilisateur_quiz` + savepoint) — *2026-09-05*
+- [x] Un étudiant ne peut pas soumettre une tentative appartenant à un autre — *2026-09-05, IDOR vérifié par test et par exploitation curl*
+- [x] Le score ne peut pas être envoyé ni influencé depuis le client — *2026-09-05, vérifié par test et par exploitation curl (`score`, `passed`, `is_staff` dans le corps, tous ignorés)*
 
-**Porte** — [ ] code-reviewer · [ ] code-tester · [ ] security-tester *(points 2, 1 et 8 — XSS stocké dans les explications)*
+**Porte** — [x] code-reviewer · [x] code-tester · [x] security-tester — *2026-09-05*
+
+> Premier passage : **1 BLOQUANT** (code-reviewer — `ruff format --check` rouge sur cinq fichiers,
+> corrigé), **11 MAJEUR**, **20 MINEUR** ; security-tester a fermé la porte au premier passage
+> (**0 CRITIQUE, 0 ÉLEVÉ, 1 MOYEN, 2 FAIBLE**). Le code-tester a par ailleurs trouvé et corrigé
+> pendant sa propre session un vrai bug produit, pas un défaut de test : `GET /api/quizzes/{id}`
+> servait les questions d'un QCM appartenant à une **formation dépubliée**, à un compte sans
+> aucune inscription (`a_acces_au_quiz` ne regardait pas `course.is_published`, alors que tous les
+> autres points d'API de contenu du projet le font). Corrigé et le test étendu aux cinq points
+> d'entrée concernés.
+>
+> Tous les MAJEUR à portée raisonnable ont été corrigés et revérifiés :
+> - **Un examen sans question verrouillait définitivement le reste du parcours** (même classe de
+>   bug que le MAJEUR 9 de l'étape 5, revenue par l'examen plutôt que par le module) — `calculer_pipeline`
+>   ignore désormais un quiz sans question, traité comme absent.
+> - **La course de concurrence sur `demarrer_tentative` laissait dépasser `max_attempts`** — contrainte
+>   `attempt_une_seule_ouverte_par_utilisateur_quiz` posée en base, recouvrement par savepoint
+>   imbriqué, revérifié par un test à deux threads réels (`transaction=True`).
+> - **`soumettre_tentative` ne revérifiait jamais le droit d'accès au quiz** entre le démarrage et la
+>   soumission (une inscription passée à `BLOCKED` entre-temps restait exploitable) — revérifié à
+>   la soumission, comme au démarrage et à la lecture.
+> - **Rien n'imposait qu'une question ait exactement une bonne réponse** — contrainte
+>   `choice_une_seule_bonne_reponse_par_question` en base (« au plus une ») + validation du
+>   formset admin `ChoiceInlineFormSet` (« au moins une », qu'une contrainte ne peut pas exprimer).
+> - **L'écran de résultat révélait toutes les bonnes réponses puis proposait « Recommencer »** —
+>   rendant la tentative suivante triviale et le plafond décoratif. La correction complète (bonne
+>   réponse + explication) ne s'affiche plus qu'à la réussite ou à la dernière tentative ; entre les
+>   deux, seul « correct / incorrect » est dit, avec une phrase qui l'explique.
+> - **Un rejet « trop rapide » (ou un débit dépassé) jetait les réponses de l'étudiant** — l'écran
+>   de question/récapitulatif n'est plus jamais remplacé par un écran d'erreur pour ces deux cas :
+>   l'erreur s'affiche à côté du bouton d'envoi, `attemptId` et réponses restent intacts.
+> - **Deux sources de vérité pour le meilleur score d'un examen** — `etat_quiz` lit désormais
+>   `ModuleCompletion.best_score` (le ratchet) pour un examen, plus de recalcul parallèle qui pourrait
+>   diverger.
+> - **Aucune donnée de démonstration : le scénario d'intégration n'était pas exécutable** —
+>   `seed_course` sème désormais un QCM réel (3 questions) sur le chapitre gratuit et un examen réel
+>   (3 questions) sur le module 0. Le scénario complet (chapitres du module 0 marqués terminés,
+>   examen réussi → module 1 déverrouillé) a été rejoué à la main sur une base fraîchement seedée.
+>
+> Deux MAJEUR sont **explicitement reportés**, avec l'accord requis avant d'y toucher plutôt que
+> tranchés unilatéralement :
+> - **Dépendance croisée entre `learning` et `assessment`** (`learning/services.py` importe
+>   `assessment.models.Quiz`, `assessment/services.py` importe `learning.models.ModuleCompletion`).
+>   Aucun cycle d'import Python à l'exécution, mais le graphe de dépendances entre applications est
+>   bouclé, et « quel module est acquis ? » se répond à deux endroits. Refermer proprement — une
+>   seule application propriétaire de la notion, l'autre l'interroge par une fonction — est un choix
+>   d'architecture qui dépasse cette porte.
+> - **Un compte `PENDING` n'a aucun chemin vers le QCM du chapitre gratuit** dans l'état actuel du
+>   produit : son tableau de bord rend `ParcoursEtudiant`, pas `Pipeline`, et `/gratuit/[chapitre]`
+>   n'affiche pas le lien. C'est la conséquence directe de la divergence `ParcoursEtudiant`/`Pipeline`
+>   déjà signalée et reportée à l'étape 5 (MAJEUR 7 de sa porte) — la capacité existe côté serveur et
+>   est testée, elle attend que cette divergence soit refermée pour devenir atteignable.
+>
+> Reportés aussi, à moindre enjeu : le rate-limiting reste par compte et mono-processus (MOYEN du
+> security-tester, même limite que documentée depuis l'étape 1, cache partagé prévu à l'étape 10) ;
+> l'ordre des choix d'un QCM est déterministe (FAIBLE du security-tester — pas de fuite, juste un
+> indice statistique si l'admin place toujours la bonne réponse en premier) ; `retourHref` du
+> composant `Qcm` pointe toujours `/app` faute d'un slug de chapitre transporté par `EtatQuiz`
+> (documenté honnêtement dans le composant plutôt que promis autrement).
+>
+> **État vérifié au 2026-09-05** : `ruff` · `ruff format` · `mypy --strict` verts ; **651 tests
+> backend, 99 % de couverture sur `apps`** (100 % sur `apps.assessment` et `apps.learning`) ;
+> `eslint` · `tsc --noEmit` verts ; **622 tests frontend, 98,3 % d'instructions / 96,6 % de
+> branches** ; `next build` sans route mal prérendue. **Il ne reste aucun BLOQUANT ni
+> CRITIQUE/ÉLEVÉ.**
 
 ---
 

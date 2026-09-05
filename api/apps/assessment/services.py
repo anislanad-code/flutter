@@ -8,9 +8,10 @@ base tranche.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Max
 from django.utils import timezone
 
@@ -100,9 +101,19 @@ def _tentatives_soumises(*, user: User, quiz: Quiz) -> int:
 def etat_quiz(*, user: User, quiz: Quiz) -> EtatQuiz:
     """Aucun champ `is_correct` ici (§4.4) : `ChoixPublic` ne porte que `id` et `text`."""
     soumises = _tentatives_soumises(user=user, quiz=quiz)
-    meilleur = Attempt.objects.filter(user=user, quiz=quiz, submitted_at__isnull=False).aggregate(
-        m=Max("score")
-    )["m"]
+    if quiz.module_id is not None:
+        # Pour un examen, `ModuleCompletion.best_score` est la source de vérité (c'est
+        # elle qui gouverne le déverrouillage du pipeline) — pas de second calcul qui
+        # pourrait diverger d'elle après une purge ou une suppression de tentatives.
+        meilleur = (
+            ModuleCompletion.objects.filter(user=user, module_id=quiz.module_id)
+            .values_list("best_score", flat=True)
+            .first()
+        )
+    else:
+        meilleur = Attempt.objects.filter(
+            user=user, quiz=quiz, submitted_at__isnull=False
+        ).aggregate(m=Max("score"))["m"]
 
     questions = [
         QuestionPublique(
@@ -147,7 +158,19 @@ def demarrer_tentative(*, user: User, quiz: Quiz) -> Attempt:
     if _tentatives_soumises(user=user, quiz=quiz) >= quiz.max_attempts:
         raise TentativesEpuiseesError
 
-    return Attempt.objects.create(user=user, quiz=quiz)
+    try:
+        # Savepoint imbriqué : le `SELECT ... FOR UPDATE` ci-dessus ne verrouille rien
+        # quand il ne ramène aucune ligne, donc deux requêtes concurrentes (double
+        # clic, deux onglets) peuvent arriver ici toutes les deux. La contrainte
+        # `attempt_une_seule_ouverte_par_utilisateur_quiz` fait échouer la seconde
+        # création en base plutôt qu'en laisser deux ouvertes ; le savepoint évite que
+        # cet échec attendu ne casse la transaction englobante.
+        with transaction.atomic():
+            return Attempt.objects.create(user=user, quiz=quiz)
+    except IntegrityError:
+        return Attempt.objects.select_for_update().get(
+            user=user, quiz=quiz, submitted_at__isnull=True
+        )
 
 
 # --- Soumission et correction -------------------------------------------------
@@ -202,8 +225,12 @@ def soumettre_tentative(
     *, user: User, attempt_id: int, reponses: dict[int, int]
 ) -> ResultatTentative:
     tentative = (
-        Attempt.objects.select_for_update()
-        .select_related("quiz")
+        Attempt.objects.select_for_update(of=("self",))
+        # `of=("self",)` : `quiz.chapter` et `quiz.module` sont des `OneToOneField`
+        # nullables, donc des jointures externes — PostgreSQL refuse `FOR UPDATE` sur
+        # leur côté nullable. Restreindre le verrou à `Attempt` seule évite l'erreur
+        # sans renoncer au `select_related` qui économise les requêtes suivantes.
+        .select_related("quiz__chapter__module__course", "quiz__module__course")
         .filter(pk=attempt_id, user=user)
         .first()
     )
@@ -211,6 +238,11 @@ def soumettre_tentative(
         raise TentativeIntrouvableError
     if tentative.submitted_at is not None:
         raise TentativeDejaSoumiseError
+    # Revérifié à la soumission, pas seulement au démarrage (§4.3) : entre les deux,
+    # l'inscription a pu passer à BLOCKED/EXPIRED ou la formation être dépubliée. Une
+    # tentative ouverte avant ce changement ne doit pas rester soumissible après.
+    if not a_acces_au_quiz(user=user, quiz=tentative.quiz):
+        raise TentativeIntrouvableError
 
     maintenant = timezone.now()
     ecoule_s = (maintenant - tentative.started_at).total_seconds()
@@ -264,7 +296,11 @@ def soumettre_tentative(
             )
         )
 
-    score = round((correctes / total) * 100) if total > 0 else 0
+    # `round()` de Python arrondit à l'entier pair (`round(62.5) == 62` mais
+    # `round(37.5) == 38`) : deux fractions identiques partiraient dans des directions
+    # opposées selon la parité du score voisin. `math.floor(x + 0.5)` arrondit toujours
+    # au-dessus à la moitié, ce qu'un étudiant attend d'un pourcentage.
+    score = math.floor((correctes / total) * 100 + 0.5) if total > 0 else 0
     reussi = score >= tentative.quiz.pass_threshold
 
     tentative.submitted_at = maintenant
